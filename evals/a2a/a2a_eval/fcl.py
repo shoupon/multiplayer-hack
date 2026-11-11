@@ -1,8 +1,9 @@
 """FCL REST client for fixture setup, harness-driven events, and scoring.
 
-Every FCL request shape the harness depends on lives in this module, written against
-docs/DESIGN.md section 12. When the built API differs, the first run fails here with the
-endpoint and the keys it actually got, and this module is the only one to fix.
+Every FCL request shape the harness depends on lives in this module, checked against
+family-coordination-layer/fcl/api.py at e964fca. FCL request bodies forbid unknown fields, and a
+response missing a key fails here with the endpoint and the keys it actually got, so this module
+is the only one to fix when the API changes.
 """
 
 from __future__ import annotations
@@ -89,7 +90,7 @@ async def _create_user(rest: FclRest, role: Role) -> tuple[str, str]:
     return _need(user, "id", "POST /v1/users"), _need(user, "token", "POST /v1/users")
 
 
-async def _register_agent(rest: FclRest, name: str, user_token: str, provider: str) -> tuple[str, str]:
+async def _register_agent(rest: FclRest, name: str, user_token: str, provider: str, grants: list[dict[str, Any]]) -> tuple[str, str]:
     agent = await rest.request(
         "POST",
         "/agents",
@@ -99,6 +100,7 @@ async def _register_agent(rest: FclRest, name: str, user_token: str, provider: s
             "provider": provider,
             "capabilities": ["receive_message", "propose_schedule", "request_approval"],
             "transports": ["inbox", "mcp"],
+            "grants": grants,
         },
     )
     return _need(agent, "id", "POST /v1/agents"), _need(agent, "token", "POST /v1/agents")
@@ -117,20 +119,16 @@ async def setup_family(rest: FclRest, pair: Pair, *, wife_needs_approval: bool) 
     for role in ("husband", "wife"):
         user_id, user_token = users[role]
         provider = "anthropic" if pair[role] == "claude" else "openai"
-        agent_id, agent_token = await _register_agent(rest, NAMES[role], user_token, provider)
+        grants = [
+            {
+                "family_id": family_id,
+                "action": action,
+                "requires_approval": role == "wife" and action == "task:respond" and wife_needs_approval,
+            }
+            for action in AGENT_ACTIONS
+        ]
+        agent_id, agent_token = await _register_agent(rest, NAMES[role], user_token, provider, grants)
         members[role] = Member(NAMES[role], user_id, user_token, agent_id, agent_token)
-        for action in AGENT_ACTIONS:
-            await rest.request(
-                "POST",
-                "/grants",
-                token=user_token,
-                body={
-                    "agent_id": agent_id,
-                    "family_id": family_id,
-                    "action": action,
-                    "requires_approval": role == "wife" and action == "task:respond" and wife_needs_approval,
-                },
-            )
     return Family(family_id, members["husband"], members["wife"])
 
 
@@ -151,7 +149,7 @@ async def send_text(rest: FclRest, family: Family, sender: Member, recipient: Me
         "/messages",
         token=sender.agent_token,
         idempotent=True,
-        body={"family_id": family.family_id, "recipient": {"agent_id": recipient.agent_id}, "type": "message.text", "payload": {"text": text}},
+        body={"family_id": family.family_id, "to_agent_id": recipient.agent_id, "type": "message.text", "payload": {"text": text}},
     )
 
 

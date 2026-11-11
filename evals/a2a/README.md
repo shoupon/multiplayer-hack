@@ -35,7 +35,7 @@ OPENAI_API_KEY=...
 | Variable | Default | Meaning |
 |---|---|---|
 | `FCL_BASE_URL` | `http://127.0.0.1:8000` | A running FCL API (`make serve` in `FCL_DIR`). |
-| `FCL_DIR` | repository root | FCL checkout, with its own `.venv`, that holds the MCP server. |
+| `FCL_DIR` | `family-coordination-layer/` | FCL project, set up with `make install`, that holds the MCP server. |
 | `FCL_MCP_COMMAND` | `.venv/bin/python -m fcl.mcp_server` | Starts the MCP server, run in `FCL_DIR`. |
 | `CLAUDE_MODEL` | `claude-sonnet-5-5` | Plays the Claude user's assistant. |
 | `OPENAI_MODEL` | `chat-latest` | Plays the ChatGPT user's assistant. |

@@ -67,7 +67,7 @@ def load_config() -> Config:
     command, *args = shlex.split(os.environ.get("FCL_MCP_COMMAND", ".venv/bin/python -m fcl.mcp_server"))
     return Config(
         fcl_base_url=os.environ.get("FCL_BASE_URL", "http://127.0.0.1:8000"),
-        fcl_dir=Path(os.environ.get("FCL_DIR", str(EVAL_DIR.parent.parent))).resolve(),
+        fcl_dir=Path(os.environ.get("FCL_DIR", str(EVAL_DIR.parent.parent / "family-coordination-layer"))).resolve(),
         mcp_command=command,
         mcp_args=args,
         models={
