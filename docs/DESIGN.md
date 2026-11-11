@@ -1,6 +1,8 @@
 # Family Coordination Layer: MVP design
 
-Status: proposed, 2026-11-11. Source brief: "Engineering Handoff: Family Coordination Layer (FCL)".
+Status: proposed, 2026-11-11. Revised the same day: Python instead of TypeScript, SQLite
+instead of PostgreSQL, so the whole system runs and tests on one laptop.
+Source brief: "Engineering Handoff: Family Coordination Layer (FCL)".
 Section references like (H§9) point at that brief.
 
 ## 1. Goal and scope
@@ -22,10 +24,14 @@ In scope:
 - Universal message envelope, durable inbox with cursor polling.
 - Coordination tasks: proposals, counterproposals, per-participant acceptance, expiry,
   cancellation, human approval.
-- Postgres-backed job queue: expiry, follow-up reminders, webhook delivery.
+- Database-backed job queue: expiry, follow-up reminders, webhook delivery.
 - Signed webhook delivery with SSRF protection.
 - MCP server adapter (stdio) over the REST API.
 - Runnable two-agent demo, including a server restart mid-negotiation.
+
+Single-laptop constraint: hosting, the demo, and the full test suite run on one machine
+with Python 3.10+ and nothing else installed. No Docker, no database server, no cloud
+service. State lives in one SQLite file.
 
 Out of scope for the MVP:
 
@@ -54,47 +60,60 @@ verified connection.
 
 | Concern | Choice | Why |
 |---|---|---|
-| Language | TypeScript on Node 22+ | Brief default (H§14). |
-| HTTP | Fastify 5 | Brief default. `inject()` gives fast in-process integration tests. |
-| Validation | Zod 4 | Parse every external input at the boundary into typed domain values. |
-| Database | PostgreSQL | Brief default. |
-| DB access | Plain SQL migrations and a thin query layer | The safety properties live in constraints: composite foreign keys for tenant isolation, partial unique indexes for idempotency, check constraints for state. An ORM would add a second schema source of truth. |
-| Test and demo database | PGlite | Real Postgres compiled to WASM. Runs without Docker or a local server. A file-backed PGlite proves restart durability. Production uses `pg` against real Postgres. |
-| Jobs | `scheduled_jobs` table drained with `FOR UPDATE SKIP LOCKED` | No extra infrastructure (H§14). Doubles as the transactional outbox. |
-| MCP | `@modelcontextprotocol/sdk` stdio server | Lets an MCP-capable assistant call FCL tools. |
-| Tests | Vitest | Brief default. |
+| Language | Python 3.10+ | Owner's choice. 3.10 is the floor because it is what the target laptop ships. |
+| HTTP | FastAPI on uvicorn | Pydantic validation at the boundary, generated OpenAPI docs at `/docs` for manual testing, `TestClient` for in-process integration tests. |
+| Validation | Pydantic v2 | Parse every external input at the boundary into typed values. Strict models reject unknown keys. |
+| Database | SQLite through the standard library `sqlite3`, WAL mode | One file, no server, survives restarts. Supports what the design needs: composite foreign keys, partial unique indexes, CHECK constraints, `RETURNING`. |
+| DB access | Plain SQL migrations and small repository functions | The safety properties live in constraints. An ORM would add a second schema source of truth. |
+| Jobs | `scheduled_jobs` table, drained by a worker thread inside the server process | No extra infrastructure (H§14). Doubles as the transactional outbox. |
+| Outbound HTTP | `httpx` | Webhook delivery, the MCP adapter's REST calls, the demo agents. |
+| MCP | `mcp` Python SDK, stdio server | Lets an MCP-capable assistant call FCL tools. |
+| Tests | pytest | Integration tests drive the real app over HTTP against a temporary SQLite file. |
 
-Architecture style: one modular monolith process (H§14), plus the MCP adapter as a
-separate thin process that talks REST.
+Architecture style: one modular monolith process (H§14) that serves HTTP and runs the job
+worker, plus the MCP adapter as a separate thin process that talks REST.
+
+SQLite allows one writer at a time. Every command opens its transaction with
+`BEGIN IMMEDIATE`, which takes the write lock up front, so commands serialize and a
+read-modify-write on a task cannot interleave with another. For a family-scale deployment
+this throughput is ample. Moving to PostgreSQL later means replacing the connection
+module and a handful of SQLite-specific statements; the repository functions keep their
+signatures.
 
 ## 4. Repository layout
 
 ```text
+pyproject.toml
 docs/                      design, plan, architecture, protocol, security, integrations
-migrations/                ordered plain-SQL migrations
-src/
-  main.ts                  HTTP server entry point plus job worker loop
-  config.ts                parsed environment configuration
-  ids.ts                   branded, prefixed identifiers
-  db/                      Database interface, pg and PGlite drivers, migration runner
-  http/                    Fastify app factory, auth hook, error mapping
-  identity/                users, credentials, token issue and verify
-  families/                families, memberships, invitations
-  agents/                  agent registry, capabilities, transports, discovery
-  authz/                   grants repository and the pure policy function
-  messaging/               envelope registry, send, inbox, acknowledgement
-  coordination/            pure task state machine, task service, routes
-  approvals/               approval requests and decisions
-  jobs/                    queue, worker, job handlers (expiry, reminder, webhook)
-  webhooks/                subscriptions, signing, SSRF guard, delivery
-  audit/                   audit event writer and reader
-  mcp/                     MCP stdio server: FCL tools mapped onto the REST API
+fcl/
+  __main__.py              CLI: `python -m fcl serve | migrate`
+  config.py                settings from environment variables, injectable clock
+  ids.py                   prefixed identifiers
+  db.py                    connections, BEGIN IMMEDIATE transactions, migration runner
+  migrations/              ordered plain-SQL migrations
+  errors.py                AppError and constructors
+  auth.py                  token resolution, principal types, FastAPI dependencies
+  policy.py                pure authorization policy
+  machine.py               pure task state machine
+  envelope.py              message type registry and payload models
+  identity.py              users and credentials
+  families.py              families, memberships, invitations
+  agents.py                agent registry, capabilities, transports, discovery
+  grants.py                delegation grants, policy facts loader
+  messaging.py             send, inbox, acknowledgement, read
+  tasks.py                 coordination task service
+  approvals.py             approval requests and decisions
+  jobs.py                  queue, worker thread, expiry and reminder handlers
+  webhooks.py              subscriptions, signing, SSRF guard, delivery handler
+  audit.py                 audit writer and reader
+  api.py                   FastAPI app factory and routes
+  mcp_server.py            MCP stdio server: FCL tools mapped onto the REST API
 demo/                      dinner scenario with two simulated agents
-test/                      unit tests for pure cores, integration tests over HTTP
+tests/                     unit tests for pure cores, integration tests over HTTP
 ```
 
-Each domain module owns its SQL, its service functions, and its routes. Pure cores
-(`authz/policy.ts`, `coordination/machine.ts`, `messaging/envelope.ts`) import nothing
+Each domain module owns its SQL and service functions. `api.py` is the only module that
+knows about HTTP. Pure cores (`policy.py`, `machine.py`, `envelope.py`) import nothing
 from HTTP or the database.
 
 ## 5. Components and trust boundaries
@@ -104,34 +123,38 @@ from HTTP or the database.
  Custom agent ───────────────HTTPS + agent token───────────────┤
  Companion UI / human ───────HTTPS + user token────────────────┤
                                                                v
-                         ┌──────────── FCL API (Fastify) ────────────┐
-   Boundary 1 ─────────> │ authenticate -> parse (Zod) -> authorize  │
+                         ┌──────────── FCL API (FastAPI) ────────────┐
+   Boundary 1 ─────────> │ authenticate -> parse (Pydantic) -> authz │
                          │ services (families, agents, messaging,    │
                          │ coordination, approvals, audit)           │
                          └──────────────┬────────────────────────────┘
                                         │ one transaction per command
                                         v
-                         ┌──────────── PostgreSQL ───────────────────┐
+                         ┌──────────── SQLite file (WAL) ────────────┐
                          │ domain tables + scheduled_jobs (outbox)   │
                          └──────────────┬────────────────────────────┘
-                                        │ SKIP LOCKED
+                                        │ claim with lease
                                         v
-                         ┌──────────── Job worker ───────────────────┐
+                         ┌──────── Job worker thread ────────────────┐
    Boundary 2 <───────── │ expiry, reminders, webhook delivery       │
                          └───────────────────────────────────────────┘
 ```
 
 | Boundary | Trust rule |
 |---|---|
-| 1. Client to API | Everything is untrusted: headers, body, the claimed sender, and any instruction inside message text. Identity comes only from the bearer token. Bodies are parsed by strict Zod schemas. |
+| 1. Client to API | Everything is untrusted: headers, body, the claimed sender, and any instruction inside message text. Identity comes only from the bearer token. Bodies are parsed by strict Pydantic models. |
 | 2. Worker to webhook receivers | Outbound requests to user-supplied URLs. Destinations are validated and the resolved IP is pinned (section 13). Payloads are signed. |
 | 3. MCP server process | Holds exactly one agent token. It is a REST client with no database access, so it cannot exceed that agent's grants. |
-| 4. Database | Trusted. Composite foreign keys still make cross-family references unrepresentable. |
+| 4. Database | Trusted. Composite foreign keys still make cross-family references unrepresentable. `PRAGMA foreign_keys = ON` is set on every connection, because SQLite leaves enforcement off by default. |
 
 ## 6. Data model
 
 All identifiers are opaque strings with a type prefix (`usr_`, `fam_`, `agt_`, `crd_`,
-`grt_`, `inv_`, `cnv_`, `msg_`, `tsk_`, `apr_`, `whk_`). Timestamps are `timestamptz`.
+`grt_`, `inv_`, `cnv_`, `msg_`, `tsk_`, `apr_`, `whk_`). SQLite storage conventions:
+timestamps are UTC ISO-8601 text in one fixed format (`2026-11-11T10:00:00.000000Z`),
+so string comparison is time comparison. JSON columns are text. Booleans are 0 or 1.
+Sequence columns (`seq`, `id` on log tables) are `INTEGER PRIMARY KEY AUTOINCREMENT`,
+which never reuses a value, so an inbox cursor never skips or repeats.
 
 | Table | Purpose and key constraints |
 |---|---|
@@ -146,11 +169,11 @@ All identifiers are opaque strings with a type prefix (`usr_`, `fam_`, `agt_`, `
 | `delegation_grants` | `agent_id`, `grantor_user_id`, `family_id`, `action`, nullable `target_user_id`, `requires_approval`, `expires_at`, `revoked_at`. FK `(agent_id, grantor_user_id)` to `agents(id, owner_user_id)`, so only an agent's owner can delegate to it. FKs from `(family_id, grantor_user_id)` and `(family_id, target_user_id)` to memberships. |
 | `conversations` | `family_id`, subject. Groups messages. |
 | `messages` | The envelope (section 9). Unique `(sender_agent_id, idempotency_key)`. FK `(conversation_id, family_id)` to `conversations(id, family_id)`. |
-| `message_deliveries` | One row per recipient agent. `seq` is a global `bigint` identity and the inbox cursor. `status` is `pending`, `delivered`, `acknowledged`, or `failed`. Unique `(message_id, recipient_agent_id)`. |
-| `coordination_tasks` | `state`, `proposal` (jsonb), `proposal_version`, `negotiation_count`, `max_negotiations`, `expires_at`, `outcome`, `row_version`. Unique `(initiator_agent_id, idempotency_key)`. |
+| `message_deliveries` | One row per recipient agent. `seq` is a global autoincrement and the inbox cursor. `status` is `pending`, `delivered`, `acknowledged`, or `failed`. Unique `(message_id, recipient_agent_id)`. |
+| `coordination_tasks` | `state`, `proposal` (JSON), `proposal_version`, `negotiation_count`, `max_negotiations`, `expires_at`, `outcome`, `row_version`. Unique `(initiator_agent_id, idempotency_key)`. |
 | `task_participants` | PK `(task_id, user_id)`. `agent_id`, `role`, `response` (`pending`, `accepted`, `declined`), `responded_version`. FK `(task_id, family_id)` to the task and `(family_id, user_id)` to memberships. |
-| `task_transitions` | Append-only task event log: `from_state`, `to_state`, `event` (jsonb), actor, linked `message_id`. Unique `(task_id, actor_agent_id, idempotency_key)`. |
-| `approval_requests` | `approver_user_id`, `requesting_agent_id`, `action` (the exact parked command, jsonb), `action_hash`, `status` (`pending`, `granted`, `denied`, `expired`, `superseded`), `expires_at`, decision fields. Partial unique index: one pending request per `(task_id, requesting_agent_id)`. |
+| `task_transitions` | Append-only task event log: `from_state`, `to_state`, `event` (JSON), actor, linked `message_id`. Unique `(task_id, actor_agent_id, idempotency_key)`. |
+| `approval_requests` | `approver_user_id`, `requesting_agent_id`, `action` (the exact parked command, JSON), `action_hash`, `status` (`pending`, `granted`, `denied`, `expired`, `superseded`), `expires_at`, decision fields. Partial unique index: one pending request per `(task_id, requesting_agent_id)`. |
 | `audit_events` | Append-only: actor (kind, user, agent, credential), action, resource, outcome (`allowed`, `denied`, `succeeded`, `failed`), reason, redacted metadata. Denials are recorded too. |
 | `webhook_subscriptions` | `agent_id`, `url`, `secret_ciphertext` (AES-256-GCM), `status`. |
 | `scheduled_jobs` | `kind`, `payload`, `run_at`, `status` (`pending`, `running`, `done`, `dead`), `attempts`, `max_attempts`, `locked_until`, `last_error`, unique nullable `dedupe_key`. |
@@ -161,8 +184,8 @@ Every family-scoped row carries `family_id`. Child rows reference parents throug
 composite keys that include `family_id`, for example `message_deliveries(message_id,
 family_id) -> messages(id, family_id)`. A row that points across families cannot be
 inserted. Every repository read takes a `FamilyId` taken from an authorized context,
-never from the request body alone. Row-level security is a later hardening step
-(section 15).
+never from the request body alone. SQLite has no row-level security; a later PostgreSQL
+port can add it (section 15).
 
 ### Revocation and deletion
 
@@ -311,8 +334,8 @@ adds a new major and FCL accepts both during migration.
 ## 10. Coordination state machine
 
 The machine is a pure reducer: `apply(task, event, now) -> { task, transitions } | error`.
-The service loads the task with `SELECT … FOR UPDATE`, applies the event, and persists
-the new row, the transition rows, the generated messages, and any jobs in one
+Inside one `BEGIN IMMEDIATE` transaction, the service loads the task, applies the event,
+and persists the new row, the transition rows, the generated messages, and any jobs in one
 transaction.
 
 States: `CREATED`, `AWAITING_DELIVERY`, `AWAITING_RESPONSE`, `COUNTERPROPOSED`,
@@ -364,9 +387,10 @@ Guards checked by the reducer, in order:
 - Each command runs in one transaction that writes domain rows, messages, deliveries, and
   `scheduled_jobs` together. That table is the transactional outbox. Nothing is sent to
   the network inside the transaction.
-- Concurrent responses to one task serialize on `SELECT … FOR UPDATE` of the task row.
-- The worker claims jobs with `FOR UPDATE SKIP LOCKED` and sets `locked_until`. A crashed
-  worker's job becomes claimable again after the lease. Every handler is idempotent: it
+- Concurrent commands serialize on SQLite's write lock, taken up front by
+  `BEGIN IMMEDIATE`, so two responses to one task cannot interleave.
+- The worker claims a due job inside a write transaction by setting `status = running` and
+  `locked_until`. A crashed worker's job becomes claimable again after the lease. Every handler is idempotent: it
   reads current state and applies only the remaining difference.
 - Jobs with a natural identity use `dedupe_key` (`expire:<task>`,
   `reminder:<task>:<version>`, `webhook:<delivery_seq>`), so re-enqueueing is a no-op.
@@ -387,7 +411,7 @@ All routes are under `/v1`, take and return JSON, and authenticate with
 | `DELETE /families/{id}/members/{userId}` | admin, or self | Remove membership. |
 | `POST /agents` | user | Register an own agent with capabilities and transports. Returns the agent token once. |
 | `GET /agents?family_id=` | user or agent | Discovery (section 8). |
-| `GET /agents/{id}/capabilities` | user or agent | Same visibility as discovery. |
+| `GET /agents/{id}/capabilities?family_id=` | user or agent | Same visibility as discovery, within one family. |
 | `POST /agents/{id}/credentials` | owner | Issue an extra agent token (rotation). |
 | `DELETE /agents/{id}/credentials/{credentialId}` | owner | Revoke one token. |
 | `POST /grants` | owner | Delegate an action to an own agent. |
@@ -452,8 +476,8 @@ GET /v1/agents/agt_…/inbox?after=0&limit=50
 - Delivery job per delivery row. Exponential backoff with jitter, `max_attempts` 8, then
   status `dead` (dead letter). The message stays in the inbox, so a dead webhook never
   loses a message.
-- SSRF protection: `https` only (plain `http` to loopback only when
-  `FCL_ALLOW_INSECURE_WEBHOOKS=true` for local development); no credentials in the URL;
+- SSRF protection: `https` only, except plain `http` to loopback when
+  `FCL_ALLOW_LOOPBACK_WEBHOOKS=true` (single-laptop development and the demo); no credentials in the URL;
   hostname resolved once per attempt; private, loopback, link-local, CGNAT, multicast,
   and metadata ranges rejected for every resolved address; the connection is pinned to
   the vetted IP so DNS rebinding cannot swap it; redirects are not followed; 5 second
@@ -463,7 +487,7 @@ GET /v1/agents/agt_…/inbox?after=0&limit=50
 
 ## 14. MCP adapter and A2A gateway
 
-**MCP.** `src/mcp/server.ts` runs over stdio with `FCL_BASE_URL` and `FCL_AGENT_TOKEN`.
+**MCP.** `fcl/mcp_server.py` runs over stdio with `FCL_BASE_URL` and `FCL_AGENT_TOKEN`.
 Tools: `fcl_list_family_agents`, `fcl_get_agent_capabilities`, `fcl_send_message`,
 `fcl_get_inbox`, `fcl_create_coordination_task`, `fcl_get_task_status`,
 `fcl_respond_to_proposal`, `fcl_request_approval` (explains that approvals are raised by
@@ -486,13 +510,16 @@ must be checked before this is built.
    before public exposure.
 2. Approvals are human-only and non-delegable in the MVP (section 8).
 3. One decline ends a task, including future multi-party tasks (section 10).
-4. Tenant isolation is query-boundary plus composite FKs, without Postgres row-level
-   security yet.
+4. Tenant isolation is query-boundary plus composite FKs. SQLite offers no row-level
+   security.
 5. Retention defaults: message payloads 180 days, audit events 400 days, purged by a job.
    Account removal deletes the user's credentials and agents and redacts their message
    payloads, while keeping audit rows with ids only.
-6. Webhook signing secrets are encrypted with one process-wide key (`FCL_ENCRYPTION_KEY`).
-   A KMS-backed key is the production target.
+6. Webhook signing secrets are encrypted with one key (`FCL_ENCRYPTION_KEY`). When it is
+   unset, the server generates one into a `0600` key file next to the database. An OS
+   keychain or KMS is the production target.
+7. The server binds to `127.0.0.1` by default. Binding to another interface is an
+   explicit setting, because item 1 makes an exposed server open to signups.
 
 ## 16. Key technical risks
 
@@ -502,7 +529,8 @@ must be checked before this is built.
 | MCP cannot wake an assistant, so coordination stalls until the human opens it. | Reminder job and, later, human notification bridges (LINE, Telegram). |
 | Prompt injection through message text. | Text never feeds authorization. Strict payload schemas, length limits, untrusted-content labelling in the MCP adapter. |
 | Multi-party semantics (`AWAITING_APPROVAL` is task-level). | Per-participant state is already stored. The task-level state is a projection that can be refined without a data migration. |
-| PGlite and `pg` differ in type parsing. | One `Database` interface. `int8` is parsed to `number` in both. The integration suite can run against real Postgres via `DATABASE_URL`. |
+| SQLite allows one writer at a time. | Short transactions, WAL mode, `busy_timeout`. Ample for one family on one laptop. Repository functions isolate SQL for a later PostgreSQL port. |
+| SQLite leaves foreign keys off by default. | The connection factory sets `PRAGMA foreign_keys = ON`; a test asserts a cross-family insert fails. |
 | Single-key secret encryption and token bootstrap. | Flagged in section 15, owner decision before public launch. |
 
 ## 17. Implementation sequence
