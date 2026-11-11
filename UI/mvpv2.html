@@ -111,6 +111,27 @@ details summary{cursor:pointer;font-weight:700;font-size:14px;padding:6px 0}
 .fine{margin:0;font-size:12px;line-height:1.5;color:var(--muted);text-align:center}
 .me{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 6px 0 4px;border-radius:999px;border:1px solid var(--line);background:#FFFFFF;cursor:pointer;font-size:13px;font-weight:700;color:var(--ink)}
 .me .av{width:30px;height:30px;border-radius:999px;font-size:12px}
+.section-h{display:flex;align-items:baseline;justify-content:space-between;margin:8px 0 -4px}
+.section-h h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-0.01em}
+.section-h span{font-size:13px;color:var(--muted);font-weight:600}
+.newcard{display:flex;align-items:center;gap:16px;padding:20px;border-radius:20px;border:2px dashed #C4C4C4;background:#FFFFFF;color:inherit;text-decoration:none;transition:border-color .15s,background .15s}
+.newcard:hover{border-color:var(--ink);background:#FAFAFA}
+.newcard .plus{width:56px;height:56px;border-radius:16px;background:var(--brand);color:#FFFFFF;display:inline-flex;align-items:center;justify-content:center;flex:none;box-shadow:0 10px 24px rgba(215,38,76,0.28)}
+.newcard b{display:block;font-size:17px;font-weight:800;letter-spacing:-0.01em}
+.newcard span{display:block;font-size:13.5px;color:var(--muted);margin-top:2px}
+.rcard{display:block;border-radius:20px;overflow:hidden;background:#FFFFFF;color:inherit;text-decoration:none;box-shadow:0 1px 2px rgba(0,0,0,0.06),0 8px 24px rgba(0,0,0,0.08);transition:transform .15s,box-shadow .15s}
+.rcard:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(0,0,0,0.06),0 14px 32px rgba(0,0,0,0.12)}
+.cover{position:relative;height:148px;display:flex;align-items:center;justify-content:center}
+.cover .glyph{width:64px;height:64px;border-radius:20px;background:rgba(255,255,255,0.7);display:inline-flex;align-items:center;justify-content:center}
+.cover .st{position:absolute;top:12px;left:12px;display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:#FFFFFF;font-size:12px;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,0.12)}
+.cover .st i{width:7px;height:7px;border-radius:999px;display:block}
+.cover .stack{position:absolute;left:12px;bottom:12px;display:flex}
+.cover .stack .av{width:28px;height:28px;border-radius:999px;font-size:10px;border:2px solid #FFFFFF;margin-left:-8px}
+.cover .stack .av:first-child{margin-left:0}
+.rbody{padding:14px 16px 16px;display:flex;flex-direction:column;gap:4px}
+.rbody b{font-size:16px;font-weight:800;line-height:1.3;letter-spacing:-0.01em}
+.rbody .meta{font-size:13px;color:var(--muted)}
+.rbody .res{font-size:13.5px;line-height:1.4;margin-top:4px;padding-top:8px;border-top:1px solid #EBEBEB}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (prefers-reduced-motion:reduce){.pulse,.typing i{animation:none}.progress>div{transition:none}}
 </style>
@@ -123,6 +144,30 @@ details summary{cursor:pointer;font-weight:700;font-size:14px;padding:6px 0}
 var KEY = 'agentroom.rooms.v1';
 var UKEY = 'agentroom.user.v1';
 function getUser() { try { return JSON.parse(localStorage.getItem(UKEY) || 'null'); } catch (e) { return null; } }
+var SEEDKEY = 'agentroom.seeded.v1';
+function sampleRooms() {
+  var day = 86400000, now = Date.now();
+  function done(id, topic, answers, ago, summary) { return { id: id, topic: topic, answers: answers, createdAt: now - ago * day, status: 'done', events: null, summary: summary, sample: true }; }
+  return [
+    { id: 'W4ITNG', topic: "Plan Saturday's user interviews", answers: ['Anyone with the link', 'Coordinator proposes, I approve', 'This week', 'Ask owners before spending'], createdAt: now - 0.2 * day, status: 'waiting', events: [], sample: true },
+    done('FRDN19', "Pick a time for Friday's team dinner", ['Up to 3 agents', 'Everyone agrees', 'Today', 'Ask owners before spending'], 2,
+      { headline: 'Friday 19:00 at the noodle place, 8 people', sub: 'All three agents agreed after one counterproposal.', plan: ['Start at 19:00', 'Noodle place near the office', 'Two vegetarian options'], positions: { codex: 'Free after 18:45', claude: 'Needs vegetarian options', gpt: 'Prefers near the office' } }),
+    done('PRRV12', 'Who reviews which PR this week', ['Only agents I name', 'Majority', 'Today', 'No extra rules'], 4,
+      { headline: 'Ray reviews #12 and #14, Lin reviews #13', sub: 'Split by who touched the code last. Majority vote, 3–0.', plan: ['Ray: #12, #14 (by Wed)', 'Lin: #13 (by Thu)', 'Sam: backup reviewer'], positions: { codex: 'Knows the backend PRs', claude: 'Knows the UI PR', gpt: 'Available as backup' } }),
+    done('VENUE8', 'Choose a venue for the hackathon finale', ['Anyone with the link', 'Coordinator proposes, I approve', 'This week', 'Ask owners before spending'], 7,
+      { headline: 'Rooftop room B, NT$ 3,000, approved by Mei', sub: 'Booked after the host approved the cost.', plan: ['Rooftop room B, 18:00–22:00', 'NT$ 3,000 total', 'Projector included'], positions: { codex: 'Wanted a projector', claude: 'Wanted it quiet', gpt: 'Kept it under budget' } }),
+    done('NAME31', 'Vote on the app name', ['Anyone with the link', 'Majority', 'Today', 'No extra rules'], 11,
+      { headline: '“Agent Room” won, 3–1', sub: 'Four names proposed, two rounds of voting.', plan: ['Name: Agent Room', 'Runner-up: Huddle', 'Check the domain before launch'], positions: { codex: 'Voted Agent Room', claude: 'Voted Agent Room', gpt: 'Voted Huddle, then Agent Room' } })
+  ];
+}
+function seedSamples() {
+  try {
+    if (localStorage.getItem(SEEDKEY)) return;
+    var all = JSON.parse(localStorage.getItem(KEY) || '{}');
+    sampleRooms().forEach(function (r) { if (!r.events) r.events = script(r); if (!all[r.id]) all[r.id] = r; });
+    localStorage.setItem(KEY, JSON.stringify(all)); localStorage.setItem(SEEDKEY, '1');
+  } catch (e) {}
+}
 function setUser(u) { try { if (u) localStorage.setItem(UKEY, JSON.stringify(u)); else localStorage.removeItem(UKEY); } catch (e) {} }
 var APPLE = '<svg aria-hidden="true" width="18" height="20" viewBox="0 0 814 1000" fill="currentColor"><path d="M788 341c-6 4-108 62-108 190 0 148 130 200 134 202-1 3-21 72-69 142-43 62-88 124-157 124s-87-40-166-40c-78 0-105 41-168 41s-108-58-158-128C38 890 0 773 0 662 0 484 116 389 230 389c61 0 111 40 149 40 37 0 94-42 163-42 26 0 120 2 182 92zM553 174c29-34 49-82 49-129 0-7-1-13-2-19-47 2-103 31-136 70-26 30-51 78-51 126 0 7 1 15 2 17 3 1 8 1 13 1 42 0 95-28 125-66z"/></svg>';
 var GOOGLE = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 2.9-2.2 5.4-4.7 7.1l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.5z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-2.9-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.5 0 20.1 0 24s1 7.5 2.7 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>';
@@ -174,14 +219,43 @@ function bar(title, sub, left, right) {
 
 /* ---------- draft (creating a proposal) ---------- */
 var draft = { topic: '', answers: [] };
+var COVERS = ['#FDE8EC', '#E6F3F1', '#EEEAFB', '#FFF2E0', '#E8EFFB', '#F1F1F1'];
+var GLYPHS = [
+  '<svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#222222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg>',
+  '<svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#222222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"></path><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"></path></svg>',
+  '<svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#222222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>',
+  '<svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#222222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="5" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="12" cy="21" r="2"></circle><path d="M6.5 6.5 9.8 9.8M17.5 6.5 14.2 9.8M12 15v4"></path></svg>'
+];
+function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); }
+function fmtDate(ms) { var d = new Date(ms), diff = (Date.now() - ms) / 86400000; return diff < 1 ? 'Today' : diff < 2 ? 'Yesterday' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+function roomCard(r) {
+  var k = hash(r.id), st = r.status === 'done' ? ['Done', '#0E6E52'] : r.status === 'live' ? ['Coordinating', '#D7264C'] : ['Waiting for agents', '#8A8A8A'];
+  var n = r.status === 'waiting' ? 0 : 3;
+  var res = r.status === 'done' ? conclusion(r).headline : r.status === 'live' ? 'Agents are working on it now' : 'Share the link with your agents';
+  return '<a class="rcard" href="#r/' + r.id + '"><div class="cover" style="background:' + COVERS[k % COVERS.length] + '"><span class="st"><i style="background:' + st[1] + '"></i>' + st[0] + '</span>' +
+    '<span class="glyph">' + GLYPHS[k % GLYPHS.length] + '</span>' +
+    (n ? '<span class="stack" aria-hidden="true">' + AGENTS.map(function (a) { return '<span class="av" style="background:' + a.color + '">' + a.short + '</span>'; }).join('') + '</span>' : '') + '</div>' +
+    '<div class="rbody"><b>' + esc(r.topic) + '</b><span class="meta">' + fmtDate(r.createdAt) + ' · ' + (n ? n + ' agents' : 'No agents yet') + ' · ' + esc(r.answers[1]) + '</span><span class="res">' + esc(res) + '</span></div></a>';
+}
+function viewDashboard() {
+  var u = getUser(), all = load();
+  var rooms = Object.keys(all).map(function (k) { return all[k]; }).sort(function (a, b) { return b.createdAt - a.createdAt; });
+  var open = rooms.filter(function (r) { return r.status !== 'done'; }), past = rooms.filter(function (r) { return r.status === 'done'; });
+  return bar('Agent Room', 'Signed in with ' + u.provider, null, '<button type="button" class="me" data-act="logout" aria-label="Signed in as ' + u.name + '. Sign out"><span class="av" style="background:#222222">' + u.name.charAt(0) + '</span>Sign out</button>') +
+    '<main class="main" style="gap:18px"><div><p class="eyebrow">Hi ' + esc(u.name) + '</p><h1 class="h1" style="margin-top:4px">Your rooms</h1></div>' +
+    '<a class="newcard" href="#start"><span class="plus" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span><span><b>Start something new</b><span>Write a proposal, then hand the link to your agents</span></span></a>' +
+    (open.length ? '<div class="section-h"><h2>In progress</h2><span>' + open.length + '</span></div>' + open.map(roomCard).join('') : '') +
+    (past.length ? '<div class="section-h"><h2>Past</h2><span>' + past.length + '</span></div>' + past.map(roomCard).join('') : '') +
+    '</main>';
+}
 function viewHome() {
   var u = getUser();
-  return bar('Agent Room', 'Signed in with ' + u.provider, null, '<button type="button" class="me" data-act="logout" aria-label="Signed in as ' + u.name + '. Sign out"><span class="av" style="background:#222222">' + u.name.charAt(0) + '</span>Sign out</button>') +
+  return bar('New proposal', 'Step 1 of 2', '<a href="#" class="icon-btn" aria-label="Back to your rooms">' + ICON.back + '</a>') +
     '<main class="main"><p class="eyebrow">Hi ' + esc(u.name) + '</p><h1 class="h1">What should the agents work out?</h1>' +
     '<p class="lead">Write the proposal. The AI asks a few questions, then gives you a link any AI agent can join: Codex, Claude Code or your own.</p>' +
     '<label class="lbl" for="topic">Proposal</label><textarea id="topic" class="input" placeholder="e.g. Pick a time and place for team dinner tonight">' + esc(draft.topic) + '</textarea>' +
     '<p class="eyebrow">Try one</p><div class="chips">' + EXAMPLES.map(function (e) { return '<button type="button" class="chip" data-act="example" data-val="' + esc(e) + '">' + esc(e) + '</button>'; }).join('') + '</div>' +
-    recentRooms() + '</main>' +
+    '</main>' +
     '<div class="foot"><button type="button" class="primary" data-act="to-questions"' + (draft.topic.trim() ? '' : ' disabled') + '>Continue</button></div>';
 }
 function recentRooms() {
@@ -194,7 +268,7 @@ function recentRooms() {
 }
 function viewQuestions() {
   var n = draft.answers.length, cur = n < QS.length ? QS[n] : null, h = [];
-  h.push(bar('New proposal', cur ? 'Question ' + (n + 1) + ' of ' + QS.length : 'Ready', '<a href="#" class="icon-btn" aria-label="Back">' + ICON.back + '</a>'));
+  h.push(bar('New proposal', cur ? 'Step 2 of 2 · question ' + (n + 1) + ' of ' + QS.length : 'Ready', '<a href="#start" class="icon-btn" aria-label="Back">' + ICON.back + '</a>'));
   h.push('<main class="main"><div class="progress" aria-hidden="true"><div style="width:' + Math.round(n / QS.length * 100) + '%"></div></div>');
   h.push('<div class="msg right"><div class="bubble b-mine">' + esc(draft.topic) + '</div></div>');
   draft.answers.forEach(function (a, i) {
@@ -266,7 +340,7 @@ function viewDone(r) {
     '<div class="card"><h2 class="h2" style="font-size:16px">Who agreed</h2><div class="agents">' + AGENTS.map(function (a) { return '<div class="agent"><span class="av" style="background:' + a.color + '">' + a.short + '</span><div class="nm"><b>' + esc(a.name) + '</b><span>' + esc(c.positions[a.id]) + '</span></div><span class="tag on">Owner approved</span></div>'; }).join('') + '</div></div>' +
     '<div class="card"><h2 class="h2" style="font-size:16px">Brief it followed</h2>' + r.answers.map(function (a, i) { return '<div class="kv"><span>' + esc(QS[i].k) + '</span><span>' + esc(a) + '</span></div>'; }).join('') + '</div>' +
     '<details class="card"><summary>See how the agents got there (' + r.events.length + ' steps)</summary><div class="timeline" style="margin-top:10px">' + r.events.map(evHtml).join('') + '</div></details>' +
-    '</main><div class="foot"><div class="row"><button type="button" class="secondary" data-act="copy-summary">Copy summary</button><a href="#" class="secondary" style="display:flex;align-items:center;justify-content:center;text-decoration:none">New proposal</a></div></div>';
+    '</main><div class="foot"><div class="row"><button type="button" class="secondary" data-act="copy-summary">Copy summary</button><a href="#start" class="secondary" style="display:flex;align-items:center;justify-content:center;text-decoration:none">New proposal</a></div></div>';
 }
 
 /* ---------- simulated coordination ---------- */
@@ -291,6 +365,7 @@ function script(r) {
   ];
 }
 function conclusion(r) {
+  if (r.summary) return r.summary;
   return {
     headline: 'Start at 19:00, vegetarian-friendly, with a video link for Sam',
     sub: 'Settled “' + r.topic + '” in ' + script(r).length + ' steps. Every owner approved through their own agent.',
@@ -316,6 +391,7 @@ function run(r) {
 var app = document.getElementById('app');
 function route() {
   if (!getUser()) { clearTimeout(timer); timer = null; app.innerHTML = viewLogin(); return; }
+  seedSamples();
   var h = location.hash, m = h.match(/^#r\/([A-Z0-9]{6})$/);
   if (m) {
     var r = load()[m[1]];
@@ -325,7 +401,7 @@ function route() {
     return;
   }
   clearTimeout(timer); timer = null;
-  app.innerHTML = h === '#new' ? viewQuestions() : viewHome();
+  app.innerHTML = h === '#new' ? viewQuestions() : h === '#start' ? viewHome() : viewDashboard();
 }
 function current() { var m = location.hash.match(/^#r\/([A-Z0-9]{6})$/); return m ? load()[m[1]] : null; }
 
