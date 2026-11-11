@@ -82,9 +82,13 @@ signatures.
 
 ## 4. Repository layout
 
+The repository is shared with another project, so FCL's code lives in
+`family-coordination-layer/`. Its documents stay in the shared `docs/` folder. Paths below
+are relative to `family-coordination-layer/`.
+
 ```text
 pyproject.toml
-docs/                      design, plan, architecture, protocol, security, integrations
+Makefile                   install, check, serve, demo, mcp
 fcl/
   __main__.py              CLI: `python -m fcl serve | migrate`
   config.py                settings from environment variables, injectable clock
