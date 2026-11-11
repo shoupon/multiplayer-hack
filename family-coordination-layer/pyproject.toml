@@ -23,7 +23,7 @@ dev = ["pytest>=8"]
 include = ["fcl*"]
 
 [tool.setuptools.package-data]
-fcl = ["migrations/*.sql"]
+fcl = ["migrations/*.sql", "web/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

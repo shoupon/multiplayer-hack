@@ -1,0 +1,5 @@
+dbs:
+  - path: ${FCL_DB_PATH}
+    replicas:
+      - url: gcs://${FCL_LITESTREAM_BUCKET}/fcl.db
+        sync-interval: 1s

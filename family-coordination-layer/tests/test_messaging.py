@@ -1,4 +1,4 @@
-from conftest import Env, Family, build_family, inbox, join, register, signup, text
+from conftest import Env, Family, build_family, inbox, join, propose_dinner, register, signup, text
 
 
 def test_direct_message_reaches_recipient_with_server_assigned_sender(env: Env, family: Family):
@@ -89,3 +89,43 @@ def test_message_visibility(env: Env, family: Family):
     assert "auth" not in env.api.ok("GET", f"/v1/messages/{msg['message_id']}", family.wife.user_token)
     outsider = signup(env.api, "Outsider")
     assert env.api.get(f"/v1/messages/{msg['message_id']}", outsider.user_token)[0] == 404
+
+
+def _count(env: Env, m) -> int:
+    return env.api.ok("GET", f"/v1/agents/{m.agent_id}/inbox/count", m.agent_token)["unacknowledged"]
+
+
+def _ack(env: Env, m, through: int) -> None:
+    env.api.ok("POST", f"/v1/agents/{m.agent_id}/inbox/ack", m.agent_token, json={"through": through})
+
+
+def test_inbox_count_counts_until_acknowledged_and_changes_nothing(env: Env, family: Family):
+    assert _count(env, family.wife) == 0
+    task = propose_dinner(env, family)
+    assert _count(env, family.wife) == 1
+    assert _count(env, family.wife) == 1
+    wife = next(p for p in env.api.ok("GET", f"/v1/tasks/{task['id']}", family.husband.agent_token)["participants"]
+                if p["agent_id"] == family.wife.agent_id)
+    assert wife["delivered"] is False, "polling the count must not deliver the proposal"
+    [item] = inbox(env, family.wife)
+    assert _count(env, family.wife) == 1, "reading is not acknowledging"
+    _ack(env, family.wife, item["cursor"])
+    assert _count(env, family.wife) == 0
+
+
+def test_unacknowledged_mode_resumes_without_a_cursor(env: Env, family: Family):
+    for i in range(3):
+        text(env, family.husband, family.wife, family.id, f"note {i}", f"u{i}")
+    first = inbox(env, family.wife)
+    _ack(env, family.wife, first[0]["cursor"])
+    pending = env.api.ok("GET", f"/v1/agents/{family.wife.agent_id}/inbox", family.wife.agent_token,
+                         params={"unacknowledged": "true"})["items"]
+    assert [i["message"]["payload"]["text"] for i in pending] == ["note 1", "note 2"]
+    _ack(env, family.wife, pending[-1]["cursor"])
+    assert env.api.ok("GET", f"/v1/agents/{family.wife.agent_id}/inbox", family.wife.agent_token,
+                      params={"unacknowledged": "true"})["items"] == []
+
+
+def test_inbox_count_is_private(env: Env, family: Family):
+    status, body = env.api.get(f"/v1/agents/{family.wife.agent_id}/inbox/count", family.husband.agent_token)
+    assert (status, body["error"]["code"]) == (403, "not_your_inbox")

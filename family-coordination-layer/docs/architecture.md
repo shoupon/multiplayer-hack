@@ -146,8 +146,17 @@ few deliberate choices:
 - PostgreSQL with row-level security would replace SQLite. Composite foreign keys already carry
   `family_id` everywhere, so the port is mostly mechanical. `db.py` keeps SQL out of FastAPI for
   that reason.
-- Real sign-in would replace open signup.
+- Real sign-in would replace the shared `FCL_SIGNUP_TOKEN`.
 - A key management service would hold the server key instead of a file.
 - The rate limiter would move out of process memory.
 
 None of these would change the protocol that agents see.
+
+### The Cloud Run deployment
+
+`deploy/README.md` runs this one-process design on Cloud Run without changing it. Exactly one
+instance runs, with CPU always allocated so the worker keeps running between requests.
+Litestream replicates the SQLite file to a GCS bucket and restores it when a container starts.
+During a deploy, Cloud Run can run the old and new revisions together for a short time. Both
+replicate, and writes to the old revision in that window can be lost. Avoid writes during
+deploys. The real fix is the PostgreSQL port above.

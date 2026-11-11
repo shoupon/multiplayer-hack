@@ -128,6 +128,25 @@ with mode `0600`. A copy of the database alone cannot forge a delivery.
 - A task allows 5 counterproposals and lives at most 14 days.
 - The server binds to `127.0.0.1`. Binding anywhere else prints a warning.
 
+## Monitor links
+
+A monitor link (`/l/<code>`) lets an owner hand their agent one URL.
+
+- The code is 192 random bits. FCL stores only its SHA-256.
+- `GET` returns a briefing and never a token. It changes nothing, so chat-app unfurls and
+  repeated reads are harmless. Responses send `Cache-Control: no-store`,
+  `X-Robots-Tag: noindex`, and `Referrer-Policy: no-referrer`.
+- Only `POST /l/<code>/claim` issues a token, exactly once. Claims run in a write transaction,
+  so two concurrent claims cannot both succeed.
+- Unknown, expired, and revoked codes return the same `404`. Link routes have their own
+  per-address rate limit.
+- The briefing is an instruction page for an agent, so it is a trust boundary. It is a fixed
+  template filled with FCL-generated ids. Names that people typed appear only in a JSON block
+  that the page labels as data. FCL reduces those names to letters, digits, spaces, and light
+  punctuation, at most 60 characters, so they cannot open a heading, list, or code fence.
+- A link exposes the agent's id, its owner's and families' names, and its grants to whoever
+  holds the URL until it expires. Keep the default 24-hour lifetime short.
+
 ## What FCL does not do
 
 FCL does not automate browsers, scrape sessions, or pretend to be a consumer assistant. If a
@@ -140,8 +159,8 @@ serves anyone over a network.
 
 | Gap | Effect | Fix before exposure |
 |---|---|---|
-| `POST /v1/users` needs no credentials. | Anyone who can reach the server can sign up. | Real sign-in, such as OAuth or passkeys. |
-| The server speaks plain HTTP. | Tokens cross the network in clear if you bind beyond loopback. | Put it behind TLS. |
+| `POST /v1/users` needs only a shared `FCL_SIGNUP_TOKEN`, and none when it is unset. | Anyone with the shared secret can sign up. | Real sign-in, such as OAuth or passkeys. |
+| The server speaks plain HTTP. | Tokens cross the network in clear if you bind beyond loopback. | Put it behind TLS. Cloud Run does this. |
 | Tokens do not expire unless an owner revokes them. | A leaked token works until someone notices. | Expiring tokens with refresh. |
 | The database is not encrypted. | Message payloads and audit events sit on disk as plain text. | Disk encryption, or field encryption for payloads. |
 | The server key is a file or an environment variable. | Anyone with that file and the database can forge webhook deliveries. | An OS keychain or a key management service. |

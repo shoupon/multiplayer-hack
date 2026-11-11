@@ -27,6 +27,10 @@ class Settings:
     run_worker: bool = True
     body_limit_bytes: int = 64 * 1024
     rate_limit_per_minute: int = 600
+    link_rate_limit_per_minute: int = 30
+    public_url: str | None = None
+    signup_token: str | None = None
+    trust_forwarded_for: bool = False
 
     @staticmethod
     def from_env(env: dict[str, str] | None = None) -> "Settings":
@@ -43,4 +47,8 @@ class Settings:
             worker_interval_seconds=float(e.get("FCL_WORKER_INTERVAL_SECONDS", "1.0")),
             run_worker=e.get("FCL_RUN_WORKER", "true") == "true",
             rate_limit_per_minute=int(e.get("FCL_RATE_LIMIT_PER_MINUTE", "600")),
+            link_rate_limit_per_minute=int(e.get("FCL_LINK_RATE_LIMIT_PER_MINUTE", "30")),
+            public_url=e.get("FCL_PUBLIC_URL", "").rstrip("/") or None,
+            signup_token=e.get("FCL_SIGNUP_TOKEN") or None,
+            trust_forwarded_for=e.get("FCL_TRUST_FORWARDED_FOR", "false") == "true",
         )
