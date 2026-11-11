@@ -31,6 +31,20 @@ class GrantSpec:
     expires_at: Optional[datetime] = None
 
 
+def insert_agent(c: Conn, now: datetime, owner_user_id: str, display_name: str, provider: str,
+                 capabilities: list[str], transports: list[str]) -> str:
+    agent_id = new_id("agent")
+    c.run(
+        "INSERT INTO agents (id, owner_user_id, display_name, provider, created_at) VALUES (?, ?, ?, ?, ?)",
+        (agent_id, owner_user_id, display_name, provider, to_db(now)),
+    )
+    for cap in capabilities:
+        c.run("INSERT INTO agent_capabilities (agent_id, capability) VALUES (?, ?)", (agent_id, cap))
+    for kind in transports:
+        c.run("INSERT INTO agent_transports (agent_id, kind, created_at) VALUES (?, ?, ?)", (agent_id, kind, to_db(now)))
+    return agent_id
+
+
 def register_agent(
     ctx: Ctx,
     p: UserPrincipal,
@@ -44,15 +58,7 @@ def register_agent(
     caps = sorted(set(capabilities))
     kinds = sorted({"inbox", *transports})  # every agent can poll its inbox
     with ctx.db.tx() as c:
-        agent_id = new_id("agent")
-        c.run(
-            "INSERT INTO agents (id, owner_user_id, display_name, provider, created_at) VALUES (?, ?, ?, ?, ?)",
-            (agent_id, p.user_id, display_name, provider, to_db(now)),
-        )
-        for cap in caps:
-            c.run("INSERT INTO agent_capabilities (agent_id, capability) VALUES (?, ?)", (agent_id, cap))
-        for kind in kinds:
-            c.run("INSERT INTO agent_transports (agent_id, kind, created_at) VALUES (?, ?, ?)", (agent_id, kind, to_db(now)))
+        agent_id = insert_agent(c, now, p.user_id, display_name, provider, caps, kinds)
         created = [
             insert_grant(c, now, p.user_id, agent_id, g.family_id, g.action, g.target_user_id, g.requires_approval, g.expires_at)
             for g in grants

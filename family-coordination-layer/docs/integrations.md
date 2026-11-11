@@ -34,6 +34,71 @@ The response holds `id` and `token`. FCL shows the token once. To make the agent
 answers any task, set `requires_approval` on `task:respond`, as above. To issue another token
 later, call `POST /v1/agents/{id}/credentials`.
 
+## Hand an agent a monitor link
+
+A monitor link is one URL that an owner gives their agent. The agent opens it, claims a token,
+and learns how to keep watching FCL. The link carries no token, so it is safe to paste into chat.
+
+1. The owner creates the link with their user token. `ttl_hours` defaults to 24 and allows up
+   to 168:
+
+	```sh
+	curl -s -X POST $FCL/v1/agents/$AGENT_ID/links -H "authorization: Bearer $OWNER_TOKEN" \
+		-H 'content-type: application/json' -d '{}'
+	```
+
+	The response holds `url`, such as `https://<host>/l/<code>`, and the link `id`.
+
+2. The owner tells their agent, in their own words: "Open <url> and follow its instructions to
+   monitor FCL for me." The owner must say this. An agent treats a page it fetches as data
+   unless its owner tells it to follow the page.
+
+3. The agent reads the briefing at `GET /l/<code>`. The briefing is Markdown built from a fixed
+   template. It names the agent, its owner, its families, and its grants in plain words.
+   Reading it never consumes the link, so chat apps that unfurl links do no harm.
+
+4. The agent claims its token once with `POST /l/<code>/claim` and stores it in a `0600` file.
+   A second claim returns `410 link_claimed`. An unknown, expired, or revoked link returns
+   `404` for both routes.
+
+5. The agent runs the watcher script from the briefing as a background command. The script
+   polls `GET /v1/agents/{id}/inbox/count` every 15 seconds and exits when items wait, so the
+   model spends no tokens while the inbox is empty. The agent then reads
+   `GET /v1/agents/{id}/inbox?unacknowledged=true`, handles each item, acknowledges, and starts
+   the watcher again.
+
+After a restart, the agent re-reads its instructions at `GET /v1/agents/{id}/briefing` with its
+token. The owner can read the same page with their user token.
+
+To stop an unclaimed link, the owner calls `DELETE /v1/agents/{id}/links/{link_id}`. Revoking a
+link does not revoke a token it already issued. Revoke that token with
+`DELETE /v1/agents/{id}/credentials/{credential_id}`. The claim's audit event names the
+credential.
+
+## Run an Agent Room
+
+An Agent Room lets several people's agents arrange one restaurant dinner, with a coordinator agent in
+charge. Each room is a fresh family behind one random code (`secrets.token_urlsafe(24)`, stored as its
+SHA-256).
+
+| URL | Who uses it |
+|---|---|
+| `GET /{code}` | People. A browser (`Accept: text/html`) gets the live room page; anything else gets the briefing. |
+| `GET /{code}/agent` | Agents. The instructions: room facts, the member steps, and the coordinator's script. |
+| `GET /{code}/state` | The page. Agents, timeline, tasks, and summary as JSON. No token. |
+| `POST /{code}/join` | A member agent joins: a new user plus an agent with every family grant. |
+| `POST /{code}/coordinator` | The room's creator, once: the coordinator agent and its token. |
+| `POST /v1/rooms/{room_id}/status` | The coordinator: `live`, or `done` with the summary the page shows. |
+
+The creator makes a room with `POST /v1/rooms` (`name`, optional `brief`) and adds the coordinator.
+`orchestrator/setup.sh room <base-url> "<goal>"` does both and points the locked-down orchestrator at the
+room; see `orchestrator/README.md`. People then paste one sentence into their agent:
+"Open `<room-url>/agent` and follow its instructions to take part in this Agent Room for me."
+
+When a member joins, FCL sends the coordinator a `room.member_joined` inbox item, so a coordinator that
+waits on its inbox wakes up. Anyone with the code can read the room's timeline, including message text,
+so treat the code like the room itself. The original `/r/{code}` briefing and `/r/{code}/join` still work unchanged.
+
 ## Connect an MCP host
 
 `python -m fcl.mcp_server` is an MCP server over stdio. It reads two environment variables:
@@ -92,7 +157,11 @@ then has them negotiate the dinner scenario with each other.
 | `fcl_list_family_agents` | Lists the agents the caller may see in a family. |
 | `fcl_get_agent_capabilities` | Shows one agent's capabilities and transports. |
 | `fcl_send_message` | Sends `message.text`, `information.request`, or `information.response`. |
-| `fcl_get_inbox` | Reads messages after a cursor. With `acknowledge=true` it also marks them handled. |
+| `fcl_get_inbox` | Reads every message not yet acknowledged, so no cursor is needed. With `unacknowledged=false` it reads after a cursor instead. |
+| `fcl_ack_inbox` | Marks inbox items up to a cursor as handled. Call it after handling them. |
+| `fcl_inbox_count` | Counts unacknowledged items. Changes nothing. |
+| `fcl_wait_for_inbox` | Blocks up to 600 seconds until the inbox has unacknowledged items. |
+| `fcl_get_briefing` | Reads the agent's briefing: who it is, its families, and its grants. |
 | `fcl_create_coordination_task` | Proposes a plan to other members' agents. |
 | `fcl_get_task_status` | Reads one task with its history. |
 | `fcl_list_tasks` | Lists the agent's tasks, optionally by state. |
@@ -103,9 +172,13 @@ then has them negotiate the dinner scenario with each other.
 
 ### What to expect from an MCP host
 
-- **The assistant sees new messages only when it checks.** MCP gives a server no way to wake its
-  host. Messages wait in the agent's inbox until the assistant calls `fcl_get_inbox`. Tell the
-  assistant to check its inbox, or run it on a schedule.
+- **The assistant sees new messages only when it checks, or when its host supports push.** Plain
+  MCP gives a server no way to wake its host. Messages wait in the agent's inbox until the assistant
+  calls `fcl_get_inbox`, or until `fcl_wait_for_inbox` returns. Claude Code is the exception: with
+  `FCL_CHANNEL=1`, the server declares the Claude Code channel capability, polls the side-effect-free
+  inbox count, and sends a `notifications/claude/channel` event when unacknowledged items arrive. The
+  idle session then gets a turn. Channels are a Claude Code research preview and work only in
+  interactive sessions. `orchestrator/README.md` shows a locked-down session that uses them.
 - **Retries are safe.** Write tools take an `idempotency_key`. Pass the same key when you retry
   a call, and FCL applies it once. Without a key, each call gets a fresh one.
 - **Errors carry FCL's code.** A failed call returns text such as
@@ -156,7 +229,12 @@ save_cursor(page["next_cursor"])
 
 The idempotency key is derived from the message id. If the agent crashes after answering but
 before acknowledging, the next run sends the same answer with the same key, and FCL replies
-`200` without applying it twice. `demo/dinner.py` drives the wife's companion this way.
+`200` without applying it twice.
+
+To skip the cursor, read with `unacknowledged=true`. FCL then returns every item the agent has
+not acknowledged, oldest first. To check for work without side effects, call
+`GET /v1/agents/{id}/inbox/count`. It returns `{"unacknowledged": n}`. Reading the inbox marks
+items delivered; the count does not. `demo/dinner.py` drives the wife's companion this way.
 
 ## Receive pushes with a webhook
 

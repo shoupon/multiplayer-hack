@@ -63,9 +63,9 @@ def main(argv: list[str] | None = None) -> None:
         port=args.port or settings.port,
         allow_loopback_webhooks=args.allow_loopback_webhooks or settings.allow_loopback_webhooks,
     )
-    if settings.host not in ("127.0.0.1", "localhost", "::1"):
+    if settings.host not in ("127.0.0.1", "localhost", "::1") and not settings.signup_token:
         print(f"WARNING: binding {settings.host}. Signup is unauthenticated in this MVP; anyone who can reach "
-              "this address can create accounts. See docs/security.md.", file=sys.stderr)
+              "this address can create accounts. Set FCL_SIGNUP_TOKEN. See docs/security.md.", file=sys.stderr)
 
     import uvicorn
 

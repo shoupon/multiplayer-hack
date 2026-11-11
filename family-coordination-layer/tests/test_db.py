@@ -25,7 +25,8 @@ def db(tmp_path):
 
 def test_migrations_apply_once(tmp_path):
     database = Database(tmp_path / "fcl.db")
-    assert migrate(database) == ["0001_init.sql", "0002_permission_requests.sql"]
+    assert migrate(database) == ["0001_init.sql", "0002_permission_requests.sql", "0003_agent_links.sql", "0004_rooms.sql",
+                                 "0005_room_page.sql"]
     assert migrate(database) == []
 
 

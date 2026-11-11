@@ -60,7 +60,7 @@ Settings come from flags or environment variables:
 | Variable | Flag | Default | Meaning |
 |---|---|---|---|
 | `FCL_DB_PATH` | `--db` | `.data/fcl.db` | SQLite file. Created on first start. |
-| `FCL_HOST` | `--host` | `127.0.0.1` | Bind address. Any other value prints a warning, because signup is open. |
+| `FCL_HOST` | `--host` | `127.0.0.1` | Bind address. Any other value prints a warning unless `FCL_SIGNUP_TOKEN` is set. |
 | `FCL_PORT` | `--port` | `8000` | Port. |
 | `FCL_SERVER_KEY` | | `server.key` next to the database | Base64 key that webhook signing secrets derive from. If unset, the server creates a 32-byte key file with mode `0600`. |
 | `FCL_ALLOW_LOOPBACK_WEBHOOKS` | `--allow-loopback-webhooks` | `false` | Allows `http://` webhook URLs that resolve to this machine. For local development only. |
@@ -69,6 +69,10 @@ Settings come from flags or environment variables:
 | `FCL_WORKER_INTERVAL_SECONDS` | | `1.0` | How often the worker looks for due jobs. |
 | `FCL_RUN_WORKER` | | `true` | Set `false` to run the API without the worker. |
 | `FCL_RATE_LIMIT_PER_MINUTE` | | `600` | Requests per minute per credential. |
+| `FCL_LINK_RATE_LIMIT_PER_MINUTE` | | `30` | Requests per minute per client address to monitor links (`/l/...`). |
+| `FCL_SIGNUP_TOKEN` | | unset | When set, `POST /v1/users` requires a matching `X-Signup-Token` header. Set it on any server others can reach. |
+| `FCL_PUBLIC_URL` | | request origin | Public origin, such as `https://fcl.example.com`, used in monitor links and briefings. Set it behind a proxy. |
+| `FCL_TRUST_FORWARDED_FOR` | | `false` | Rate-limit by the last `X-Forwarded-For` hop. Set `true` only behind a proxy that appends the caller's address, such as Cloud Run. |
 
 ## Walk through the API with curl
 

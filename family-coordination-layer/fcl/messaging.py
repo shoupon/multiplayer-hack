@@ -190,17 +190,26 @@ def send_direct(
         return True, envelope(m, d, include_auth=True)
 
 
-def inbox(ctx: Ctx, p: AgentPrincipal, agent_id: str, after: int, limit: int) -> dict[str, Any]:
-    """Deliveries after the cursor, oldest first. Fetching marks them delivered."""
+def _require_own_inbox(p: AgentPrincipal, agent_id: str, action: str) -> None:
     if agent_id != p.agent_id:
-        raise forbidden("not_your_inbox", "agents can only read their own inbox", DeniedAudit("inbox.read", None, "agent", agent_id))
+        raise forbidden("not_your_inbox", "agents can only use their own inbox", DeniedAudit(action, None, "agent", agent_id))
+
+
+def inbox(ctx: Ctx, p: AgentPrincipal, agent_id: str, after: int, limit: int, unacknowledged: bool = False) -> dict[str, Any]:
+    """
+    Deliveries after the cursor, oldest first. Fetching marks them delivered.
+    `unacknowledged` returns only deliveries not yet acknowledged, so a restarted agent needs no cursor.
+    """
+    _require_own_inbox(p, agent_id, "inbox.read")
     now = ctx.clock()
     from . import tasks  # local import: tasks sends messages through this module
 
     with ctx.db.tx() as c:
         rows = c.all(
-            "SELECT * FROM message_deliveries WHERE recipient_agent_id = ? AND seq > ? ORDER BY seq LIMIT ?",
-            (agent_id, after, limit),
+            """SELECT * FROM message_deliveries
+                WHERE recipient_agent_id = ? AND seq > ? AND (? = 0 OR status != 'acknowledged')
+                ORDER BY seq LIMIT ?""",
+            (agent_id, after, int(unacknowledged), limit),
         )
         items = []
         for d in rows:
@@ -215,9 +224,20 @@ def inbox(ctx: Ctx, p: AgentPrincipal, agent_id: str, after: int, limit: int) ->
     return {"items": items, "next_cursor": items[-1]["cursor"] if items else after}
 
 
+def inbox_count(ctx: Ctx, p: AgentPrincipal, agent_id: str) -> dict[str, int]:
+    """How many deliveries await acknowledgement. Changes nothing, so a watcher can poll it freely."""
+    _require_own_inbox(p, agent_id, "inbox.read")
+    with ctx.db.read() as c:
+        row = c.one(
+            "SELECT count(*) AS n FROM message_deliveries WHERE recipient_agent_id = ? AND status != 'acknowledged'",
+            (agent_id,),
+        )
+    assert row is not None
+    return {"unacknowledged": row["n"]}
+
+
 def acknowledge(ctx: Ctx, p: AgentPrincipal, agent_id: str, through: int) -> int:
-    if agent_id != p.agent_id:
-        raise forbidden("not_your_inbox", "agents can only acknowledge their own inbox", DeniedAudit("inbox.ack", None, "agent", agent_id))
+    _require_own_inbox(p, agent_id, "inbox.ack")
     now = ctx.clock()
     with ctx.db.tx() as c:
         return c.run(

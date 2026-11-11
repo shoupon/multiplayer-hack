@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "mcp__fcl"
+    ],
+    "deny": [
+      "Agent",
+      "Task",
+      "Bash",
+      "BashOutput",
+      "KillShell",
+      "Monitor",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "Read",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+      "Skill",
+      "SendMessage",
+      "ListAgents",
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "RemoteTrigger",
+      "Workflow",
+      "mcp__computer-use"
+    ]
+  },
+  "disableAllHooks": true,
+  "autoMemoryEnabled": false,
+  "disableClaudeAiConnectors": true,
+  "crossSessionInbound": "refuse",
+  "isolatePeerMachines": true
+}

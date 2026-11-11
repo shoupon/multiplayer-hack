@@ -82,6 +82,13 @@ class TaskFailedPayload(_Payload):
     reason: str = Field(min_length=1, max_length=500)
 
 
+class RoomMemberJoinedPayload(_Payload):
+    """Sent to a room's coordinator when a member agent joins. Names are in GET /{code}/state."""
+
+    room_id: str
+    agent_id: str
+
+
 @dataclass(frozen=True)
 class MessageType:
     origin: Literal["direct", "engine"]
@@ -103,6 +110,7 @@ MESSAGE_TYPES: dict[str, MessageType] = {
     "task.status": MessageType("engine", TaskStatusPayload),
     "task.completed": MessageType("engine", TaskCompletedPayload),
     "task.failed": MessageType("engine", TaskFailedPayload),
+    "room.member_joined": MessageType("engine", RoomMemberJoinedPayload),
 }
 DIRECT_TYPES = tuple(t for t, m in MESSAGE_TYPES.items() if m.origin == "direct")
 

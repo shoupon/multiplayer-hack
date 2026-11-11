@@ -17,6 +17,8 @@ MessageId = NewType("MessageId", str)
 TaskId = NewType("TaskId", str)
 ApprovalId = NewType("ApprovalId", str)
 WebhookId = NewType("WebhookId", str)
+LinkId = NewType("LinkId", str)
+RoomId = NewType("RoomId", str)
 
 PREFIX = {
     "user": "usr",
@@ -30,6 +32,8 @@ PREFIX = {
     "task": "tsk",
     "approval": "apr",
     "webhook": "whk",
+    "link": "lnk",
+    "room": "rom",
 }
 
 
