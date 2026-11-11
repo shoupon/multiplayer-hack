@@ -36,7 +36,8 @@ service. State lives in one SQLite file.
 Out of scope for the MVP:
 
 - A2A gateway (designed in section 12, built in Phase 4).
-- Calendar, restaurant, or any other external side effect (H§13).
+- Calendar, restaurant, or any other external side effect (H§13). FCL records that an
+  owner allowed an agent to act outside FCL (section 8). It never performs the action.
 - Messaging bridges (LINE, Telegram).
 - Human login via OIDC or passkeys (section 7 explains the token-based stand-in).
 
@@ -50,7 +51,7 @@ Out of scope for the MVP:
 | Family | A tenant. A user may belong to several. |
 | Grant | A delegation from a user to one of their own agents: one action, in one family, optionally toward one target user. |
 | Task | A durable coordination between participants, driven by a state machine. |
-| Approval request | A parked agent action that waits for the agent's human to approve that exact action. |
+| Approval request | A request that waits for an agent's human to decide. Either a parked task answer or a permission to act outside FCL (section 8). |
 
 One human is never assumed to be one agent, and one agent is never assumed to be one
 provider. The `provider` field on an agent is a self-reported label. It never implies a
@@ -83,18 +84,21 @@ signatures.
 ## 4. Repository layout
 
 The repository is shared with another project, so FCL's code lives in
-`family-coordination-layer/`. Its documents stay in the shared `docs/` folder. Paths below
-are relative to `family-coordination-layer/`.
+`family-coordination-layer/`. The design documents stay in the shared `docs/` folder. The
+user-facing documents live in `family-coordination-layer/docs/`. Paths below are relative
+to `family-coordination-layer/`.
 
 ```text
 pyproject.toml
-Makefile                   install, check, serve, demo, mcp
+Makefile                   install, check, serve, demo, viz, demo-celebration, mcp
+README.md                  how to install, run, and use FCL
+docs/                      architecture.md, protocol.md, security.md, integrations.md
 fcl/
   __main__.py              CLI: `python -m fcl serve | migrate`
   config.py                settings from environment variables, injectable clock
   ids.py                   prefixed identifiers
   db.py                    connections, BEGIN IMMEDIATE transactions, migration runner
-  migrations/              ordered plain-SQL migrations
+  migrations/              ordered plain-SQL migrations (0001_init.sql, 0002_permission_requests.sql)
   errors.py                AppError and constructors
   auth.py                  token resolution, principal types, FastAPI dependencies
   policy.py                pure authorization policy
@@ -107,12 +111,20 @@ fcl/
   messaging.py             send, inbox, acknowledgement, read
   tasks.py                 coordination task service
   approvals.py             approval requests and decisions
+  permissions.py           permission requests: scopes, validation, creation
   jobs.py                  queue, worker thread, expiry and reminder handlers
   webhooks.py              subscriptions, signing, SSRF guard, delivery handler
   audit.py                 audit writer and reader
   api.py                   FastAPI app factory and routes
   mcp_server.py            MCP stdio server: FCL tools mapped onto the REST API
-demo/                      dinner scenario with two simulated agents
+demo/
+  dinner.py                dinner scenario with two simulated agents (`make demo`)
+  viz.py, viz.html         localhost step-by-step replay of the dinner demo (`make viz`)
+  celebration.py           three-agent demo against in-process mock calendar, booking, and
+                           email services (`make demo-celebration`)
+  outside.py               the mock outside services used by celebration.py
+  decision_log.py          ordered log of who said, asked, decided, and did what, printed at the end
+                           of celebration.py and written as `decision-log.html`
 tests/                     unit tests for pure cores, integration tests over HTTP
 ```
 
@@ -177,9 +189,9 @@ which never reuses a value, so an inbox cursor never skips or repeats.
 | `coordination_tasks` | `state`, `proposal` (JSON), `proposal_version`, `negotiation_count`, `max_negotiations`, `expires_at`, `outcome`, `row_version`. Unique `(initiator_agent_id, idempotency_key)`. |
 | `task_participants` | PK `(task_id, user_id)`. `agent_id`, `role`, `response` (`pending`, `accepted`, `declined`), `responded_version`. FK `(task_id, family_id)` to the task and `(family_id, user_id)` to memberships. |
 | `task_transitions` | Append-only task event log: `from_state`, `to_state`, `event` (JSON), actor, linked `message_id`. Unique `(task_id, actor_agent_id, idempotency_key)`. |
-| `approval_requests` | `approver_user_id`, `requesting_agent_id`, `action` (the exact parked command, JSON), `action_hash`, `status` (`pending`, `granted`, `denied`, `expired`, `superseded`), `expires_at`, decision fields. Partial unique index: one pending request per `(task_id, requesting_agent_id)`. |
+| `approval_requests` | `kind` (`task_response` or `permission`), `approver_user_id`, `requesting_agent_id`, `action` (the exact parked command or the exact permission asked for, JSON), `action_hash`, `status` (`pending`, `granted`, `denied`, `expired`, `superseded`), `expires_at`, decision fields. `task_id` is required for `task_response` and optional for `permission`. Partial unique index: one pending `task_response` per `(task_id, requesting_agent_id)`. Unique `(requesting_agent_id, idempotency_key)` for permission requests. |
 | `audit_events` | Append-only: actor (kind, user, agent, credential), action, resource, outcome (`allowed`, `denied`, `succeeded`, `failed`), reason, redacted metadata. Denials are recorded too. |
-| `webhook_subscriptions` | `agent_id`, `url`, `secret_ciphertext` (AES-256-GCM), `status`. |
+| `webhook_subscriptions` | `agent_id`, `url`, `secret_salt`, `status`. The signing secret is not stored (section 13). |
 | `scheduled_jobs` | `kind`, `payload`, `run_at`, `status` (`pending`, `running`, `done`, `dead`), `attempts`, `max_attempts`, `locked_until`, `last_error`, unique nullable `dedupe_key`. |
 
 ### Tenant isolation
@@ -275,11 +287,28 @@ grants, or other families.
 
 ### Approval scope
 
-An approval request stores the exact parked command (task id, response kind,
+Approvals have two kinds. They share one queue, so an owner sees everything their agents
+wait on in one place. Only the named owner decides, and only with a user credential.
+
+`task_response` parks an agent's answer to a task. It stores the exact parked command (task id, response kind,
 `proposal_version`, proposal body) and its hash. Granting it applies that command once.
 If the task moved on in the meantime (a newer `proposal_version`, a terminal state), the
 command is stale and the approval becomes `superseded` instead of applying anything.
 Approval never widens a grant.
+
+`permission` is an agent asking its own owner before it acts outside FCL. The request
+carries a `scope`, its `params`, a `purpose`, and an `expires_at` at most 24 hours ahead.
+The `purpose` is shown to the owner verbatim. It can name a `task_id`. Scopes:
+
+| Scope | Params |
+|---|---|
+| `calendar.read` | `window_start`, `window_end`, at most 31 days apart. |
+| `payment.charge` | `payee`, `amount_minor`, `currency`, `reference`. |
+
+FCL never performs the outside action. It records the exact request and tells the agent
+the decision with `approval.granted` or `approval.denied`. The approval id is meant to be
+the outside service's idempotency key, so an approved action runs once. A permission
+request is not a grant and does not change one.
 
 ## 9. Message envelope
 
@@ -316,9 +345,9 @@ A registry maps each `type` to a payload schema and a route of origin:
 
 | Type | Origin |
 |---|---|
-| `message.text`, `information.request`, `information.response` | `POST /v1/messages` |
+| `message.text`, `information.request`, `information.response` | `POST /v1/messages`. The information types take an optional `data` object, the same content in machine-readable form. |
 | `coordination.proposal`, `.counterproposal`, `.accept`, `.decline`, `.cancel` | Task engine, produced by task endpoints |
-| `approval.request`, `approval.granted`, `approval.denied` | Approval engine |
+| `approval.request`, `approval.granted`, `approval.denied` | Approval engine. `approval.granted` and `approval.denied` carry `approval_id` and `kind`. |
 | `task.status`, `task.completed`, `task.failed` | Task engine and reminder job |
 
 `POST /v1/messages` rejects engine-only types with 422 and names the task endpoint to use.
@@ -358,13 +387,16 @@ Terminal: `COMPLETED`, `DECLINED`, `EXPIRED`, `CANCELLED`, `FAILED`.
 | `AWAITING_APPROVAL` | `approval_denied` | open state | Parked response dropped. |
 | non-terminal | `cancel` | `CANCELLED` | Initiator only. |
 | non-terminal | `expire` | `EXPIRED` | `now >= expires_at`. |
-| `AGREED` | `complete` | `COMPLETED` | Explicit participant action. Never inferred from delivery. |
+| `AGREED` | `complete` | `COMPLETED` | Explicit participant action with evidence. Never inferred from delivery. |
 | non-terminal | `fail` | `FAILED` | System only, for unrecoverable delivery or invariant failure. |
 
 "Open" means `AWAITING_DELIVERY`, `AWAITING_RESPONSE`, or `COUNTERPROPOSED`. A response
 that arrives while the task is still `AWAITING_DELIVERY` is valid; the recipient clearly
 received the proposal. After an approval resolves, the open state is derived from the
 data: `COUNTERPROPOSED` if `proposal_version > 1`, else `AWAITING_RESPONSE`.
+
+`complete` requires `evidence`, a JSON object such as a booking reference. The machine
+stores it in `outcome.completion` as `{by_user_id, evidence, completed_at}`.
 
 Guards checked by the reducer, in order:
 
@@ -406,18 +438,19 @@ All routes are under `/v1`, take and return JSON, and authenticate with
 
 | Method and path | Principal | Purpose |
 |---|---|---|
-| `POST /users` | none (MVP bootstrap) | Create a user, return a user token once. |
+| `POST /users` | none (MVP bootstrap) | Create a user. Returns a flat object with `id`, `display_name`, and `token` (shown once). |
 | `GET /me` | user or agent | Who am I. |
 | `POST /families` | user | Create a family. Caller becomes admin. |
 | `GET /families/{id}` | member | Family and member list. |
 | `POST /families/{id}/invitations` | admin | Create a one-time invitation code. |
 | `POST /invitations/accept` | user | Join with a code. |
 | `DELETE /families/{id}/members/{userId}` | admin, or self | Remove membership. |
-| `POST /agents` | user | Register an own agent with capabilities and transports. Returns the agent token once. |
+| `POST /agents` | user | Register an own agent with capabilities and transports. Returns a flat object with the agent fields and `token` (shown once). |
 | `GET /agents?family_id=` | user or agent | Discovery (section 8). |
-| `GET /agents/{id}/capabilities?family_id=` | user or agent | Same visibility as discovery, within one family. |
+| `GET /agents/{id}/capabilities?family_id=` | user or agent | Same visibility as discovery, within one family. `family_id` is required. |
 | `POST /agents/{id}/credentials` | owner | Issue an extra agent token (rotation). |
 | `DELETE /agents/{id}/credentials/{credentialId}` | owner | Revoke one token. |
+| `DELETE /agents/{id}` | owner | Disable the agent. |
 | `POST /grants` | owner | Delegate an action to an own agent. |
 | `GET /grants?agent_id=` | owner | List grants. |
 | `DELETE /grants/{id}` | owner | Revoke. |
@@ -425,12 +458,14 @@ All routes are under `/v1`, take and return JSON, and authenticate with
 | `GET /messages/{id}` | sender or recipient agent, or their owners | Read one envelope. |
 | `GET /agents/{id}/inbox?after=<cursor>&limit=` | that agent | Poll deliveries after a cursor. Marks them `delivered`. |
 | `POST /agents/{id}/inbox/ack` | that agent | `{ "through": <cursor> }` marks deliveries `acknowledged`. |
-| `POST /tasks` | agent | Create a coordination task. Requires `Idempotency-Key`. |
+| `POST /tasks` | agent | Create a coordination task. `invitees` is a list of agent ids. Requires `Idempotency-Key`. |
 | `GET /tasks?state=` | participant user or agent | List. |
 | `GET /tasks/{id}` | participant user or agent | Task, participants, full transition history. |
-| `POST /tasks/{id}/responses` | participant agent | `accept`, `decline`, `counterpropose`, `complete`. Requires `Idempotency-Key`. |
+| `POST /tasks/{id}/responses` | participant agent | `accept`, `decline`, `counterpropose`, `complete`. `complete` requires `evidence` (an object) and only `complete` allows it. Requires `Idempotency-Key`. |
 | `POST /tasks/{id}/cancel` | initiator agent | Cancel. |
-| `GET /approvals?status=` | user | Own approval requests. |
+| `POST /approvals` | agent | Ask the agent's owner for a permission (section 8). Requires `Idempotency-Key`. Returns 201, or 200 on a replay. |
+| `GET /approvals?status=` | user | Own approval requests, both kinds. |
+| `GET /approvals/{id}` | approver user or requesting agent | One approval request. 404 for everyone else. |
 | `POST /approvals/{id}/decisions` | approver user only | `{ "decision": "grant" \| "deny" }`. |
 | `POST /webhooks` | owner | Subscribe an own agent. Returns the signing secret once. |
 | `DELETE /webhooks/{id}` | owner | Unsubscribe. |
@@ -445,7 +480,7 @@ Idempotency-Key: 6f1c…
 
 {
   "family_id": "fam_…",
-  "invitees": [{ "agent_id": "agt_wife" }],
+  "invitees": ["agt_wife"],
   "intent": "schedule_dinner",
   "proposal": { "proposed_time": "2026-11-13T19:00:00+08:00", "duration_minutes": 90 },
   "expires_at": "2026-11-13T12:00:00+08:00"
@@ -477,6 +512,9 @@ GET /v1/agents/agt_…/inbox?after=0&limit=50
 
 - Signature header `FCL-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>")>`.
   Receivers reject timestamps older than 5 minutes and deduplicate on `message_id`.
+- The signing secret is `"whsec_" + HMAC-SHA256(server_key, "webhook:{subscription_id}:{salt}")`.
+  Only the salt is stored, so a copy of the database alone cannot forge deliveries. The
+  secret is shown once, when the subscription is created, and re-derived for each delivery.
 - Delivery job per delivery row. Exponential backoff with jitter, `max_attempts` 8, then
   status `dead` (dead letter). The message stays in the inbox, so a dead webhook never
   loses a message.
@@ -492,12 +530,13 @@ GET /v1/agents/agt_…/inbox?after=0&limit=50
 ## 14. MCP adapter and A2A gateway
 
 **MCP.** `fcl/mcp_server.py` runs over stdio with `FCL_BASE_URL` and `FCL_AGENT_TOKEN`.
-Tools: `fcl_list_family_agents`, `fcl_get_agent_capabilities`, `fcl_send_message`,
-`fcl_get_inbox`, `fcl_create_coordination_task`, `fcl_get_task_status`,
-`fcl_respond_to_proposal`, `fcl_request_approval` (explains that approvals are raised by
-FCL when a grant requires one), `fcl_get_pending_approvals` (the agent's own parked
-requests). Every tool is a REST call made with the agent token. The server enforces
-authorization; the MCP process enforces nothing. MCP gives the assistant tools to call
+Tools (12): `fcl_whoami`, `fcl_list_family_agents`, `fcl_get_agent_capabilities`,
+`fcl_send_message`, `fcl_get_inbox`, `fcl_create_coordination_task`, `fcl_get_task_status`,
+`fcl_list_tasks`, `fcl_respond_to_proposal`, `fcl_request_permission`, `fcl_get_approval`,
+`fcl_get_pending_approvals`. Every tool is a REST call made with the agent token. Failures
+are raised as MCP `ToolError` with the text `"<status> <code>: <message>"`, so the model
+sees the FCL error code. An unreachable server is reported as `fcl_unreachable`. The server
+enforces authorization; the MCP process enforces nothing. MCP gives the assistant tools to call
 when it runs. It gives FCL no way to wake the assistant, so inbound messages wait in the
 durable inbox until the assistant calls `fcl_get_inbox`.
 
@@ -519,9 +558,11 @@ must be checked before this is built.
 5. Retention defaults: message payloads 180 days, audit events 400 days, purged by a job.
    Account removal deletes the user's credentials and agents and redacts their message
    payloads, while keeping audit rows with ids only.
-6. Webhook signing secrets are encrypted with one key (`FCL_ENCRYPTION_KEY`). When it is
-   unset, the server generates one into a `0600` key file next to the database. An OS
-   keychain or KMS is the production target.
+6. Webhook signing secrets are derived from one server key, not stored (section 13). The key
+   comes from `FCL_SERVER_KEY` (base64). When it is unset, the server creates a `server.key`
+   file next to the database on first start, with mode `0600`. Anyone who holds the key can
+   forge deliveries, and losing it invalidates every secret. An OS keychain or KMS is the
+   production target.
 7. The server binds to `127.0.0.1` by default. Binding to another interface is an
    explicit setting, because item 1 makes an exposed server open to signups.
 
@@ -535,7 +576,7 @@ must be checked before this is built.
 | Multi-party semantics (`AWAITING_APPROVAL` is task-level). | Per-participant state is already stored. The task-level state is a projection that can be refined without a data migration. |
 | SQLite allows one writer at a time. | Short transactions, WAL mode, `busy_timeout`. Ample for one family on one laptop. Repository functions isolate SQL for a later PostgreSQL port. |
 | SQLite leaves foreign keys off by default. | The connection factory sets `PRAGMA foreign_keys = ON`; a test asserts a cross-family insert fails. |
-| Single-key secret encryption and token bootstrap. | Flagged in section 15, owner decision before public launch. |
+| One server key derives every webhook secret, and token bootstrap. | Flagged in section 15, owner decision before public launch. |
 
 ## 17. Implementation sequence
 
