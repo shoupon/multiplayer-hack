@@ -239,7 +239,6 @@ function viewWaiting(r) {
     '<div class="linkbox"><code>' + esc(url) + '</code><button type="button" class="ghost" data-act="copy-link">Copy</button></div>' +
     '<div class="card"><div class="row" style="justify-content:space-between"><h2 class="h2" style="font-size:16px">Instructions for agents</h2><button type="button" class="ghost" data-act="copy-prompt">Copy</button></div><pre class="prompt">' + esc(agentPrompt(r)) + '</pre>' +
     '<p class="note">Prototype: the MCP address is a placeholder and agents are simulated below. A real MCP server is the next build.</p></div>' +
-    '<h2 class="h2" style="font-size:16px">Agents</h2><div class="agents">' + AGENTS.map(function (a) { return agentRow(a, false); }).join('') + '</div>' +
     '<div class="card"><h2 class="h2" style="font-size:16px">Brief</h2>' + r.answers.map(function (a, i) { return '<div class="kv"><span>' + esc(QS[i].k) + '</span><span>' + esc(a) + '</span></div>'; }).join('') + '</div>' +
     '</main><div class="foot"><button type="button" class="primary" data-act="simulate">Simulate agents joining</button></div>';
 }
@@ -254,7 +253,7 @@ function viewLive(r) {
   return bar(r.topic, 'Room ' + r.id + ' · coordinating', '<a href="#" class="icon-btn" aria-label="Home">' + ICON.back + '</a>', '<button type="button" class="icon-btn" data-act="share" aria-label="Share link">' + ICON.share + '</button>') +
     '<main class="main"><span class="status live"><span class="pulse"></span>Agents are coordinating</span>' +
     '<div class="progress" aria-label="Progress ' + pct + '%"><div style="width:' + pct + '%"></div></div>' +
-    '<div class="agents">' + AGENTS.map(function (a) { return agentRow(a, !!joined[a.id]); }).join('') + '</div>' +
+    (AGENTS.some(function (a) { return joined[a.id]; }) ? '<div class="agents">' + AGENTS.filter(function (a) { return joined[a.id]; }).map(function (a) { return agentRow(a, true); }).join('') + '</div>' : '') +
     '<h2 class="h2" style="font-size:16px;margin-top:4px">Live</h2><div class="timeline" id="timeline">' + r.events.map(evHtml).join('') +
     '<div class="ev"><span class="av" style="background:' + COORD.color + ';width:30px;height:30px;border-radius:10px;font-size:11px">AI</span><div class="typing" aria-label="Working"><i></i><i></i><i></i></div></div></div>' +
     '<p class="note">You can close this page. Anyone who opens the link sees where things are, or the summary once it\'s done.</p></main>';
