@@ -168,8 +168,11 @@ def propose_dinner(env: Env, fam: Family, idem: str = "dinner-1", hours: int = 1
     return task
 
 
-def respond(env: Env, m: Member, task_id: str, kind: str, version: int, idem: str, proposal: Optional[dict] = None) -> tuple[int, Any]:
+def respond(env: Env, m: Member, task_id: str, kind: str, version: int, idem: str, proposal: Optional[dict] = None,
+            evidence: Optional[dict] = None) -> tuple[int, Any]:
     body: dict[str, Any] = {"kind": kind, "proposal_version": version}
     if proposal is not None:
         body["proposal"] = proposal
+    if evidence is not None:
+        body["evidence"] = evidence
     return env.api.post(f"/v1/tasks/{task_id}/responses", m.agent_token, body, idem=idem)

@@ -27,7 +27,8 @@ owner's family members. Find agents with fcl_list_family_agents, propose plans w
 fcl_create_coordination_task, read replies with fcl_get_inbox, and answer with
 fcl_respond_to_proposal. Pass the same idempotency_key when you retry a call so it is applied once.
 Some of your responses may need your owner's approval; FCL decides that from your grants and tells
-you with result "pending_approval". """
+you with result "pending_approval". Before you act outside FCL for your owner (read their calendar,
+charge their card), ask with fcl_request_permission and wait for approval.granted in your inbox. """
 
 server = MCPServer(name="fcl", instructions=INSTRUCTIONS, version="0.1.0")
 
@@ -96,8 +97,9 @@ def fcl_send_message(
     payload: dict[str, Any],
     idempotency_key: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Send a direct message. Payload shapes: message.text {"text"}; information.request {"topic", "question"};
-    information.response {"topic", "answer"}. Reuse idempotency_key when retrying."""
+    """Send a direct message. Payload shapes: message.text {"text"}; information.request {"topic", "question",
+    "data"?}; information.response {"topic", "answer", "data"?}. `data` is an optional JSON object carrying the
+    same content in machine-readable form. Reuse idempotency_key when retrying."""
     return _call("POST", "/v1/messages", idempotency_key=idempotency_key, json={
         "family_id": family_id, "to_agent_id": to_agent_id, "type": message_type, "payload": payload})
 
@@ -155,17 +157,49 @@ def fcl_respond_to_proposal(
     location: Optional[str] = None,
     note: Optional[str] = None,
     reason: Optional[str] = None,
+    evidence: Optional[dict[str, Any]] = None,
     idempotency_key: Optional[str] = None,
 ) -> dict[str, Any]:
     """Answer the current proposal of a task. proposal_version must be the task's current version.
-    For counterpropose, give the new proposal fields. `complete` marks an agreed task as done.
+    For counterpropose, give the new proposal fields. `complete` marks an agreed task as done and needs
+    `evidence`, an object proving it was carried out (e.g. {"booking_reference": ...}).
     result is "applied", "noop" (already recorded), or "pending_approval" (your owner must approve first)."""
     body: dict[str, Any] = {"kind": kind, "proposal_version": proposal_version}
     if kind == "counterpropose":
         body["proposal"] = _proposal(proposed_time, duration_minutes, location, note)
     if reason:
         body["reason"] = reason
+    if evidence is not None:
+        body["evidence"] = evidence
     return _call("POST", f"/v1/tasks/{task_id}/responses", json=body, idempotency_key=idempotency_key)
+
+
+@server.tool()
+def fcl_request_permission(
+    family_id: str,
+    scope: Literal["calendar.read", "payment.charge"],
+    params: dict[str, Any],
+    purpose: str,
+    expires_at: str,
+    task_id: Optional[str] = None,
+    idempotency_key: Optional[str] = None,
+) -> dict[str, Any]:
+    """Ask your owner for permission to act outside FCL on their behalf. Params by scope:
+    calendar.read {"window_start", "window_end"} (ISO-8601 with offset, at most 31 days apart);
+    payment.charge {"payee", "amount_minor", "currency", "reference"}. `purpose` is shown to your owner
+    verbatim. Returns the request with status "pending"; approval.granted or approval.denied arrives in
+    your inbox. Use the approval id as the outside service's idempotency key so the action runs once."""
+    body: dict[str, Any] = {"family_id": family_id, "scope": scope, "params": params, "purpose": purpose,
+                            "expires_at": expires_at}
+    if task_id:
+        body["task_id"] = task_id
+    return _call("POST", "/v1/approvals", json=body, idempotency_key=idempotency_key)
+
+
+@server.tool()
+def fcl_get_approval(approval_id: str) -> dict[str, Any]:
+    """One approval or permission request you made: its status (pending, granted, denied, expired) and exact scope."""
+    return _call("GET", f"/v1/approvals/{approval_id}")
 
 
 @server.tool()

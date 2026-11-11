@@ -111,6 +111,7 @@ class ApprovalDenied:
 @dataclass(frozen=True)
 class Complete:
     user_id: str
+    evidence: dict[str, Any]
     kind: ClassVar[str] = "complete"
 
 
@@ -296,7 +297,8 @@ def apply(task: Task, event: Event, now: datetime) -> Result:
     if isinstance(event, Complete):
         if task.state != "AGREED":
             return Err("invalid_transition", f"cannot complete a task in {task.state}")
-        return Ok(replace(task, state="COMPLETED"))
+        completion = {"by_user_id": p.user_id, "evidence": event.evidence, "completed_at": now.isoformat()}
+        return Ok(replace(task, state="COMPLETED", outcome={**(task.outcome or {}), "completion": completion}))
     if isinstance(event, ApprovalDenied):
         if not p.approval_pending:
             return Err("invalid_transition", "no approval is pending for this participant")

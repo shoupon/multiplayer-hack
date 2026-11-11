@@ -125,7 +125,7 @@ def save(
         if after.state in machine.TERMINAL or after.state == "AGREED":
             # Nothing left to approve: close parked responses so they cannot be applied later.
             c.run(
-                "UPDATE approval_requests SET status = ? WHERE task_id = ? AND status = 'pending'",
+                "UPDATE approval_requests SET status = ? WHERE task_id = ? AND status = 'pending' AND kind = 'task_response'",
                 ("expired" if after.state == "EXPIRED" else "superseded", task_id),
             )
     row = c.one(
@@ -300,7 +300,8 @@ def _participant_or_404(t: machine.Task, p: AgentPrincipal) -> machine.Participa
 
 
 def _event_for(kind: ResponseKind, user_id: str, version: int, proposal: Optional[dict[str, Any]],
-               reason: Optional[str], via_approval: bool = False) -> machine.Event:
+               reason: Optional[str], via_approval: bool = False,
+               evidence: Optional[dict[str, Any]] = None) -> machine.Event:
     if kind == "accept":
         return machine.Accept(user_id, version, via_approval)
     if kind == "decline":
@@ -308,7 +309,8 @@ def _event_for(kind: ResponseKind, user_id: str, version: int, proposal: Optiona
     if kind == "counterpropose":
         assert proposal is not None
         return machine.Counterpropose(user_id, version, proposal, via_approval)
-    return machine.Complete(user_id)
+    assert evidence is not None
+    return machine.Complete(user_id, evidence)
 
 
 def _announce(c: Conn, now: datetime, row: Row, before: machine.Task, after: machine.Task, event: machine.Event,
@@ -365,6 +367,7 @@ def respond(
     proposal_version: int,
     proposal: Optional[Proposal],
     reason: Optional[str],
+    evidence: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     now = ctx.clock()
     outcome: Union[dict[str, Any], Failure]
@@ -391,7 +394,7 @@ def respond(
                 outcome = _park(c, now, row, t, p, kind, proposal_version, proposal_json, reason, allowed.grant.id,
                                 idempotency_key, req_hash)
             else:
-                event = _event_for(kind, part.user_id, proposal_version, proposal_json, reason)
+                event = _event_for(kind, part.user_id, proposal_version, proposal_json, reason, evidence=evidence)
                 r = machine.apply(t, event, now)
                 if isinstance(r, machine.Err):
                     raise machine_error(r)

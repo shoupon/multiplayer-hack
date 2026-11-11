@@ -56,7 +56,7 @@ def test_dinner_coordination_with_counterproposal_and_human_approval(env: Env):
     assert his["history"][4]["event"]["approval_id"] == approval["id"]
 
     # Agreement is not completion: that takes an explicit act.
-    status, done = respond(env, w, task["id"], "complete", 2, "w-done")
+    status, done = respond(env, w, task["id"], "complete", 2, "w-done", evidence={"booking_reference": "R1"})
     assert status == 200 and done["task"]["state"] == "COMPLETED"
     kinds = [i["message"]["type"] for i in inbox(env, w, proposal["cursor"])]
     assert kinds == ["approval.granted", "coordination.accept", "task.status", "task.completed"]

@@ -27,11 +27,15 @@ class Text(_Payload):
 class InformationRequest(_Payload):
     topic: str = Field(min_length=1, max_length=100)
     question: str = Field(min_length=1, max_length=2000)
+    data: Optional[dict[str, Any]] = None
 
 
 class InformationResponse(_Payload):
+    """`answer` is for people; `data` is the same answer in a shape another agent can parse (still untrusted)."""
+
     topic: str = Field(min_length=1, max_length=100)
     answer: str = Field(min_length=1, max_length=4000)
+    data: Optional[dict[str, Any]] = None
 
 
 class ProposalPayload(_Payload):
@@ -61,6 +65,7 @@ class ApprovalRequestPayload(_Payload):
 
 class ApprovalDecisionPayload(_Payload):
     approval_id: str
+    kind: Optional[Literal["task_response", "permission"]] = None
 
 
 class TaskStatusPayload(_Payload):

@@ -16,7 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from . import agents, approvals, audit, families, grants, identity, messaging, tasks, webhooks
+from . import agents, approvals, audit, families, grants, identity, messaging, permissions, tasks, webhooks
 from .agents import GrantSpec
 from .auth import AgentPrincipal, Principal, UserPrincipal, acting_user_id, resolve_principal
 from .context import Ctx
@@ -122,10 +122,21 @@ class RespondBody(Body):
     proposal_version: int = Field(ge=1)
     proposal: Optional[Proposal] = None
     reason: Optional[str] = Field(default=None, max_length=500)
+    evidence: Optional[dict[str, Any]] = Field(
+        default=None, description="Required for complete: what proves the plan was carried out, e.g. a booking reference.")
 
 
 class CancelBody(Body):
     reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class PermissionRequestBody(Body):
+    family_id: str = Field(pattern=id_pattern("family"))
+    scope: str = Field(max_length=64, description="One of: " + ", ".join(permissions.SCOPES))
+    params: dict[str, Any]
+    purpose: str = Field(min_length=1, max_length=500, description="Shown to the owner verbatim.")
+    expires_at: AwareDatetime
+    task_id: Optional[str] = Field(default=None, pattern=id_pattern("task"))
 
 
 class DecisionBody(Body):
@@ -402,15 +413,31 @@ def create_app(ctx: Ctx, lifespan_hooks: Optional[list[Callable[[], Callable[[],
                 key: str = Depends(idempotency_key)) -> dict[str, Any]:
         if (body.kind == "counterpropose") != (body.proposal is not None):
             raise bad_request("invalid_request", "proposal is required for counterpropose and only allowed there")
+        if (body.kind == "complete") != (body.evidence is not None):
+            raise bad_request("invalid_request", "evidence is required for complete and only allowed there")
         return tasks.respond(ctx, p, task_id, idempotency_key=key, req_hash=request_hash(body.model_dump(mode="json")),
                              kind=body.kind, proposal_version=body.proposal_version, proposal=body.proposal,
-                             reason=body.reason)
+                             reason=body.reason, evidence=body.evidence)
 
     @app.post("/v1/tasks/{task_id}/cancel", tags=["tasks"])
     def cancel_task(body: CancelBody, task_id: str = IdPath("task"), p: AgentPrincipal = Depends(agent)) -> dict[str, Any]:
         return tasks.cancel(ctx, p, task_id, body.reason)
 
     # ---- approvals ----
+
+    @app.post("/v1/approvals", tags=["approvals"])
+    def request_permission(body: PermissionRequestBody, response: Response, p: AgentPrincipal = Depends(agent),
+                           key: str = Depends(idempotency_key)) -> dict[str, Any]:
+        """An agent asks its own owner for a scoped permission to act outside FCL. Only the owner can decide."""
+        created, approval_id = permissions.request(
+            ctx, p, idempotency_key=key, family_id=body.family_id, scope=body.scope, params=body.params,
+            purpose=body.purpose, expires_at=body.expires_at, task_id=body.task_id)
+        response.status_code = 201 if created else 200
+        return approvals.get(ctx, p, approval_id)
+
+    @app.get("/v1/approvals/{approval_id}", tags=["approvals"])
+    def get_approval(approval_id: str = IdPath("approval"), p: Principal = Depends(principal)) -> dict[str, Any]:
+        return approvals.get(ctx, p, approval_id)
 
     @app.get("/v1/approvals", tags=["approvals"])
     def list_approvals(status: Optional[Literal["pending", "granted", "denied", "expired", "superseded"]] = None,

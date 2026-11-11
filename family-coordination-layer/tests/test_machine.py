@@ -65,7 +65,7 @@ def test_dinner_flow_deliver_counterpropose_accept_agree_complete():
     task = run(task, Accept("usr_h", 2))
     assert task.state == "AGREED"
     assert task.outcome is not None and task.outcome["proposal"] == SEVEN_THIRTY
-    assert run(task, Complete("usr_w")).state == "COMPLETED"
+    assert run(task, Complete("usr_w", {"booking_reference": "R1"})).state == "COMPLETED"
 
 
 def test_does_not_agree_until_every_participant_accepts():
@@ -127,4 +127,4 @@ def test_denied_approval_returns_to_the_open_state():
 
 
 def test_cannot_complete_a_task_that_is_not_agreed():
-    assert code(run(fresh(), Enqueue(), Delivered("usr_w")), Complete("usr_h")) == "invalid_transition"
+    assert code(run(fresh(), Enqueue(), Delivered("usr_w")), Complete("usr_h", {"booking_reference": "R1"})) == "invalid_transition"
