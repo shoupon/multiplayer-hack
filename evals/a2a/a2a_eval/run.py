@@ -81,7 +81,8 @@ async def main() -> None:
     total = len(scenarios) * len(pairs) * args.reps
     results: list[EpisodeResult] = []
 
-    print(f"run {run_id}: {total} episodes, claude={cfg.models['claude']} openai={cfg.models['openai']}, cap ${cfg.max_usd}")
+    agents = ", ".join(f"{p}={cfg.models[p] or 'default'} via {cfg.backends[p]}" for p in PROVIDERS)
+    print(f"run {run_id}: {total} episodes, {agents}, cap ${cfg.max_usd}")
     async with httpx.AsyncClient() as http:
         try:
             for scenario in scenarios:

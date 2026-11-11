@@ -27,12 +27,17 @@ carry the state between iterations and sessions, so any session can resume.
    in `$FCL_DIR`. If not, log "waiting on FCL" and schedule the next wake-up in 1800 seconds.
 2. FCL is serving at `$FCL_BASE_URL`. `curl -s -o /dev/null -w '%{http_code}' $FCL_BASE_URL/v1/me`
    prints `401`. If not, start it with `make serve` in `$FCL_DIR`, in the background.
-3. Both API keys are set, in the environment or in `.env.local`. Check names only. Never print a
-   value. If one is missing, stop and ask the owner.
+3. Credentials for each agent backend (README, "Agent backends"). On the default `cli` backend,
+   `claude -p "say ok"` and `codex exec --skip-git-repo-check "say ok"` both answer. On the `api`
+   backend, the API key is set in the environment or in `.env.local`. Check names only. Never
+   print a value. If a login or key is missing, stop and ask the owner.
 4. `.venv/bin/python -m pytest -q` passes.
-5. Spend. Sum the `usd` column of `results.tsv` for rows with a `cand-` or `baseline` label.
-   Stop when the total reaches `LOOP_BUDGET_USD` (default 60). Cost per matrix run was estimated
-   on 2026-11-11 at $5 to $9 for 16 episodes. Each run is also capped by `MAX_RUN_USD`.
+5. Spend. On the `api` backend, sum the `usd` column of `results.tsv` for rows with a `cand-` or
+   `baseline` label. Stop when the total reaches `LOOP_BUDGET_USD` (default 60). Cost per matrix
+   run was estimated on 2026-11-11 at $5 to $9 for 16 episodes. Each run is also capped by
+   `MAX_RUN_USD`. On the `cli` backend, runs cost no API money but draw on the subscription's
+   usage limits. Stop when a run prints a `subscription rate limit` warning, or when the owner's
+   usage-limit rules say to pause.
 
 ## Iteration
 
@@ -51,8 +56,8 @@ carry the state between iterations and sessions, so any session can resume.
    - **Harness or scenario.** A check misjudged the evidence, or a scripted line is ambiguous.
      Fix it, log it, and re-baseline.
 3. **Hypothesis.** Pick the largest prompt-caused cluster. Choose the narrowest surface, in this
-   order: a tool description in `prompts/tools.json`, then `prompts/shared.md`, then a provider
-   overlay. Use `claude.md` or `openai.md` only when the failure follows one provider across
+   order: a tool description in `prompts/tools.json` (API backend only; the CLIs ignore it), then
+   `prompts/shared.md`, then a provider overlay. Use `claude.md` or `openai.md` only when the failure follows one provider across
    both role orientations. Append the iteration to `LOOP_LOG.md` before running: number, cluster,
    hypothesis, file changed.
 4. **Candidate.** Run `.venv/bin/python -m a2a_eval.run --reps 2 --label cand-<n>` with the same

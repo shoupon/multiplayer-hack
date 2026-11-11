@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import shutil
+import tempfile
+import uuid
 from contextlib import AsyncExitStack
 from datetime import datetime, timezone
 from pathlib import Path
@@ -7,6 +10,7 @@ from typing import TextIO
 
 import httpx
 
+from .cli_agents import ClaudeCliSession, CliOptions, CodexCliSession
 from .config import Config, api_key
 from .domain import OTHER, ROLES, Check, EpisodeResult, Evidence, Family, Pair, Role, Turn
 from .evidence import Dates, scenario_dates
@@ -54,19 +58,39 @@ async def run_episode(
     turns: list[Turn] = []
     warnings: list[str] = []
     error = ""
-    errlog_path = log_dir / f"{scenario.id}-{pair.husband}-{pair.wife}-rep{rep}.mcp.log"
+    episode_name = f"{scenario.id}-{pair.husband}-{pair.wife}-rep{rep}"
+    errlog_path = log_dir / f"{episode_name}.mcp.log"
 
     async def make_agent(stack: AsyncExitStack, role: Role, errlog: TextIO) -> AgentSession:
         launch = McpLaunch(cfg.mcp_command, cfg.mcp_args, cfg.fcl_dir, cfg.fcl_base_url)
         mcp = await FclMcp.connect(stack, launch, family[role].agent_token, errlog)
+        provider = pair[role]
+        system = compose_system(prompts, provider, mcp.instructions, persona(role, family, d, notes.get(role)))
+        if cfg.backends[provider] == "cli":
+            if prompts.tool_overrides and role == "husband":
+                warnings.append("tools.json is not applied on the cli backend; the CLIs read tool descriptions from the server")
+            workdir = Path(tempfile.mkdtemp(prefix="fcl-agent-"))
+            stack.callback(shutil.rmtree, workdir, ignore_errors=True)
+            cli = CliOptions(
+                binary=cfg.claude_bin if provider == "claude" else cfg.codex_bin,
+                model=cfg.models[provider],
+                system=system,
+                launch=launch,
+                agent_token=family[role].agent_token,
+                meter=meter,
+                max_steps=cfg.max_tool_steps,
+                timeout=cfg.cli_turn_timeout,
+                workdir=workdir,
+                transcript=stack.enter_context((log_dir / f"{episode_name}.{role}.{provider}.jsonl").open("w")),
+            )
+            return ClaudeCliSession(cli, str(uuid.uuid4())) if provider == "claude" else CodexCliSession(cli)
         tools, unknown = apply_tool_overrides(mcp.tools, prompts.tool_overrides)
         if unknown:
             warnings.append(f"tools.json overrides tools the server does not expose: {', '.join(unknown)}")
-        provider = pair[role]
         options = SessionOptions(
             model=cfg.models[provider],
             api_key=api_key(provider),
-            system=compose_system(prompts, provider, mcp.instructions, persona(role, family, d, notes.get(role))),
+            system=system,
             tools=tools,
             execute=mcp.call,
             meter=meter,
@@ -84,6 +108,7 @@ async def run_episode(
                         await step.run(rest, family)
                         continue
                     out = await agents[step.who].turn(step.text)
+                    warnings.extend(f"{step.who}: {n}" for n in out.notes)
                     turns.append(Turn(step.who, pair[step.who], step.text, out.tool_calls, out.reply, out.model_calls))
         except Exception as err:
             budget = budget_exceeded_in(err)

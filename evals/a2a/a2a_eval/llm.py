@@ -1,5 +1,6 @@
-"""Two agent drivers with identical behavior: one human message in, a tool loop over FCL's MCP
-tools, one reply out. Only the provider wire format differs."""
+"""API-key agent drivers with identical behavior: one human message in, a tool loop over FCL's MCP
+tools, one reply out. Only the provider wire format differs. cli_agents.py has the subscription
+drivers, which implement the same AgentSession protocol."""
 
 from __future__ import annotations
 
@@ -43,9 +44,9 @@ class Meter:
         self.max_usd = max_usd
         self.usage: dict[Provider, Usage] = {p: Usage() for p in PROVIDERS}
 
-    def add(self, provider: Provider, input_tokens: int, cached_input_tokens: int, output_tokens: int) -> None:
+    def add(self, provider: Provider, input_tokens: int, cached_input_tokens: int, output_tokens: int, calls: int = 1) -> None:
         u = self.usage[provider]
-        u.calls += 1
+        u.calls += calls
         u.input_tokens += input_tokens
         u.cached_input_tokens += cached_input_tokens
         u.output_tokens += output_tokens
@@ -69,6 +70,7 @@ class TurnOutput:
     tool_calls: list[ToolCall] = field(default_factory=list)
     reply: str = ""
     model_calls: int = 0
+    notes: list[str] = field(default_factory=list)
 
 
 class AgentSession(Protocol):
