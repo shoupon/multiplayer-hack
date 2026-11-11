@@ -137,10 +137,8 @@ def create_app() -> FastAPI:
         return {"id": run.id}
 
     @app.get("/api/runs/latest")
-    def last(after: int = 0) -> dict[str, Any]:
-        if not latest:
-            raise HTTPException(404, {"code": "no_runs"})
-        return latest[-1].page(after)
+    def last(after: int = 0) -> Optional[dict[str, Any]]:
+        return latest[-1].page(after) if latest else None
 
     @app.get("/api/runs/{run_id}")
     def get(run_id: str, after: int = 0) -> dict[str, Any]:
