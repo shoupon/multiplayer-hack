@@ -2,725 +2,304 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Multiplayer Orchestrator · MVP v1 screens</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<title>Multiplayer Orchestrator · MVP v1 demo</title>
 <!--
-  MVP v1 screens for the Multiplayer Orchestrator, recreated from docs/PRD.md (commit 62d3dc3).
-  Static, clickable prototype: open this file in a browser. No build step, no backend.
-  All names, shops, amounts and times are sample data. Outside services are shown as mocks, as in the PRD.
+  MVP v1 demo for the Multiplayer Orchestrator (based on docs/PRD.md).
+  Three phones side by side in one page:
+    Phone 1 (Mei) starts a topic, answers the AI's clarifying questions and creates the chat room.
+    Phones 2 and 3 (Ray, Lin) start on an invitation and join the room once it exists.
+  Everything runs in this page: no backend, no build step. The AI replies are scripted for the demo.
 -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap">
 <style>
-html,body{margin:0;background:#F5F5F2}
-a{color:#1B3E9C}a:hover{color:#132C70}
-.proto{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:10px 32px;background:#17191E;color:#FFFFFF;font:14px/1.4 Inter,system-ui,sans-serif}
-.proto strong{font-weight:600;margin-right:4px}
-.proto nav{display:flex;flex-wrap:wrap;gap:6px}
-.proto nav a{color:#D9DCE3;text-decoration:none;padding:6px 10px;border-radius:6px;min-height:20px}
-.proto nav a:hover{color:#FFFFFF;background:#2C2F36}
-.proto nav a[aria-current="page"]{color:#17191E;background:#FFFFFF;font-weight:600}
-.proto label{display:inline-flex;align-items:center;gap:8px;margin-left:auto;color:#D9DCE3}
-.proto label[hidden]{display:none}
-.proto input{width:18px;height:18px}
+:root{
+  --ink:#222222; --muted:#6A6A6A; --line:#DDDDDD; --soft:#F7F7F7; --bubble:#F1F1F1;
+  --brand:#D7264C; --brand-ink:#B01E3E; --brand-soft:#FFF0F3; --white:#FFFFFF;
+  --shadow:0 6px 20px rgba(0,0,0,0.08); --shadow-lg:0 24px 60px rgba(0,0,0,0.16);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--soft);color:var(--ink);font-family:'Plus Jakarta Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{background-color:#F3F3F3;background-image:radial-gradient(#D6D6D6 1px,transparent 1px);background-size:20px 20px}
+button,input,textarea{font-family:inherit}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 28px;background:var(--white);border-bottom:1px solid #EBEBEB}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;letter-spacing:-0.01em}
+.brand-mark{width:30px;height:30px;border-radius:9px;background:var(--brand);display:inline-flex;align-items:center;justify-content:center}
+.brand small{font-weight:500;color:var(--muted);font-size:13px;margin-left:6px}
+.ghost{min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--white);color:var(--ink);font-size:14px;font-weight:600;cursor:pointer}
+.ghost:hover{border-color:var(--ink)}
+.stage{display:flex;gap:56px;justify-content:center;padding:36px 28px 48px;overflow-x:auto}
+.col{display:flex;flex-direction:column;gap:12px;flex:none}
+.frame-label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);font-weight:500}
+.frame-label b{color:var(--ink);font-weight:700}
+.dot{width:8px;height:8px;border-radius:999px}
+.phone{width:390px;height:844px;border-radius:52px;background:#1A1A1A;padding:10px;box-shadow:var(--shadow-lg)}
+.screen{width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--white);display:flex;flex-direction:column;position:relative}
+.island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:110px;height:30px;border-radius:999px;background:#1A1A1A;z-index:3}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* screen parts */
+.appbar{display:flex;align-items:center;gap:10px;padding:52px 18px 12px;background:var(--white)}
+.appbar.bordered{border-bottom:1px solid #EBEBEB}
+.icon-btn{width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:var(--white);display:inline-flex;align-items:center;justify-content:center;color:var(--ink);cursor:pointer;flex:none}
+.body{flex:1;min-height:0;overflow-y:auto;padding:8px 22px 16px;display:flex;flex-direction:column;gap:14px}
+.foot{padding:12px 18px 26px;background:var(--white);border-top:1px solid #EBEBEB}
+.eyebrow{margin:0;font-size:13px;font-weight:600;color:var(--muted)}
+.h1{margin:0;font-size:28px;line-height:1.15;font-weight:800;letter-spacing:-0.02em}
+.lead{margin:0;font-size:15px;line-height:1.5;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:8px}
+.field label{font-size:13px;font-weight:700}
+textarea.input{min-height:132px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;font-size:16px;line-height:1.5;color:var(--ink);resize:none;outline:none}
+textarea.input:focus,input.input:focus{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+input.input{flex:1;min-width:0;height:48px;padding:0 18px;border:1px solid var(--line);border-radius:999px;font-size:16px;color:var(--ink);outline:none;background:var(--white)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--white);color:var(--ink);font-size:14px;font-weight:600;cursor:pointer}
+.chip:hover{border-color:var(--ink)}
+.chip.answer{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.primary{width:100%;min-height:54px;border:0;border-radius:12px;background:var(--brand);color:var(--white);font-size:16px;font-weight:700;cursor:pointer}
+.primary:hover{background:var(--brand-ink)}
+.primary:disabled{background:#EBEBEB;color:#8A8A8A;cursor:not-allowed}
+.send{width:48px;height:48px;border-radius:999px;border:0;background:var(--brand);color:var(--white);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+.send:hover{background:var(--brand-ink)}
+.row{display:flex;gap:8px;align-items:center}
+.progress{height:4px;border-radius:999px;background:#EBEBEB;overflow:hidden;margin:0 18px 6px}
+.progress > div{height:4px;border-radius:999px;background:var(--ink);transition:width .25s ease}
+
+/* chat */
+.chat{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column-reverse;background:var(--white)}
+.chat-inner{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.sys{margin:4px 0;text-align:center;font-size:12px;font-weight:600;color:var(--muted)}
+.who{font-size:11px;font-weight:700;color:var(--muted);margin:0 0 4px 4px}
+.ai-who{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted);margin:0 0 4px 2px}
+.ai-dot{width:18px;height:18px;border-radius:6px;background:var(--brand);display:inline-flex;align-items:center;justify-content:center}
+.bubble{padding:10px 14px;font-size:14.5px;line-height:1.45;max-width:100%;word-wrap:break-word}
+.msg{display:flex;flex-direction:column;max-width:82%}
+.msg.left{align-self:flex-start}
+.msg.right{align-self:flex-end}
+.b-other{background:var(--bubble);border-radius:18px 18px 18px 6px}
+.b-mine{background:var(--ink);color:var(--white);border-radius:18px 18px 6px 18px}
+.b-ai{background:var(--white);border:1px solid #EBEBEB;border-radius:18px 18px 18px 6px;box-shadow:var(--shadow)}
+.card{border:1px solid #EBEBEB;border-radius:18px;padding:16px;background:var(--white);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
+.card h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-0.01em}
+.kv{display:flex;justify-content:space-between;gap:12px;font-size:14px;padding-top:10px;border-top:1px solid #EBEBEB}
+.kv span:first-child{color:var(--muted)}
+.kv span:last-child{font-weight:700;text-align:right}
+.private{border:1.5px solid var(--ink);border-radius:18px;padding:12px 14px;background:var(--white);display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.45}
+.pill{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--ink);color:var(--white)}
+.avatars{display:flex}
+.av{width:30px;height:30px;border-radius:999px;color:var(--white);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid var(--white);margin-left:-8px}
+.av:first-child{margin-left:0}
+.av.pending{background:#EBEBEB !important;color:#8A8A8A}
+.typing{display:inline-flex;gap:4px;padding:12px 14px}
+.typing i{width:6px;height:6px;border-radius:999px;background:#B0B0B0;display:block;animation:blink 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.3}40%{opacity:1}}
+
+/* invite */
+.invite-hero{margin:4px 0 0;border-radius:22px;padding:22px;background:var(--brand-soft);display:flex;flex-direction:column;gap:14px}
+.host-av{width:56px;height:56px;border-radius:999px;background:var(--ink);color:var(--white);display:inline-flex;align-items:center;justify-content:center;font-size:20px;font-weight:800}
+.waiting{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
+.spinner{width:16px;height:16px;border-radius:999px;border:2px solid #DDDDDD;border-top-color:var(--ink);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media (max-width:640px){
+  .topbar{padding:12px 16px}
+  .brand small{display:none}
+  .stage{justify-content:flex-start;gap:20px;padding:20px 16px 32px;scroll-snap-type:x mandatory}
+  .col{scroll-snap-align:center}
+  .phone{width:calc(100vw - 40px);max-width:390px;height:780px;border-radius:44px;padding:8px}
+  .screen{border-radius:36px}
+}
+@media (prefers-reduced-motion:reduce){.typing i,.spinner{animation:none}.progress > div{transition:none}}
 </style>
 </head>
 <body>
-<div class="proto">
-<strong>MVP v1 prototype</strong>
-<nav aria-label="Prototype screens">
-<a href="#goal" data-nav="goal">1 Goal</a>
-<a href="#brief" data-nav="brief">2 Brief</a>
-<a href="#room" data-nav="room">3 Room (host)</a>
-<a href="#team" data-nav="team">4 Room (Team Cedar)</a>
-<a href="#approval" data-nav="approval">5 Approval</a>
-<a href="#done" data-nav="done">6 Done</a>
-</nav>
-<label id="concern-toggle" hidden><input type="checkbox" id="concern-open" checked> Team Cedar's concern is open</label>
+<header class="topbar">
+<div class="brand">
+<span class="brand-mark" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="5" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="12" cy="21" r="2"></circle><path d="M6.5 6.5 9.8 9.8M17.5 6.5 14.2 9.8M12 15v4"></path></svg></span>
+<span>Orchestrator<small>MVP v1 · three-phone demo</small></span>
 </div>
-<section id="goal" class="screen" aria-label="Goal" hidden>
-<div style="min-height: 100%; background: #F5F5F2; color: #17191E; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.5;">
-<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 14px 32px; background: #FFFFFF; border-bottom: 1px solid #E2E2DC;">
-<div style="display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 600; font-size: 18px;">
-<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2451C8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="5" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="12" cy="21" r="2"></circle><path d="M6.5 6.5 9.8 9.8M17.5 6.5 14.2 9.8M12 15v4"></path></svg>
-<span>Orchestrator</span>
-</div>
-<nav aria-label="Room setup steps" style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px;">
-<span aria-current="step" style="padding: 6px 12px; border-radius: 999px; background: #E8EEFB; color: #1B3E9C; font-weight: 600;">1 Goal</span>
-<span style="padding: 6px 12px; border-radius: 999px; color: #585D69;">2 Brief</span>
-<span style="padding: 6px 12px; border-radius: 999px; color: #585D69;">3 Room</span>
-</nav>
-<div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #585D69;">
-<span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: #17191E; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">M</span>
-<span>Mei · host</span>
-</div>
+<button type="button" class="ghost" id="reset">Start over</button>
 </header>
-<main style="max-width: 760px; margin: 0 auto; padding: 72px 32px 64px; box-sizing: border-box;">
-<p style="margin: 0 0 8px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #585D69;">New room</p>
-<h1 style="margin: 0 0 12px; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 40px; line-height: 1.15; font-weight: 600;">What should the teams achieve?</h1>
-<p style="margin: 0 0 32px; font-size: 17px; color: #3D424C; max-width: 620px;">Type a title and a goal. Nothing else. The orchestrator drafts a brief of what the goal depends on, and you commit what matters.</p>
-<form style="display: flex; flex-direction: column; gap: 22px; background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 32px;">
-<div style="display: flex; flex-direction: column; gap: 8px;">
-<label for="room-title" style="font-weight: 600; font-size: 14px;">Title</label>
-<input id="room-title" type="text" value="Finale dinner for three teams" style="min-height: 48px; padding: 0 14px; border: 1px solid #C9C9C2; border-radius: 8px; font-family: inherit; font-size: 16px; color: #17191E; background: #FFFFFF;">
-</div>
-<div style="display: flex; flex-direction: column; gap: 8px;">
-<label for="room-goal" style="font-weight: 600; font-size: 14px;">Goal</label>
-<textarea id="room-goal" rows="5" style="padding: 12px 14px; border: 1px solid #C9C9C2; border-radius: 8px; font-family: inherit; font-size: 16px; line-height: 1.5; color: #17191E; background: #FFFFFF; resize: vertical;">Get dinner to all three hackathon teams by 19:30 tonight. Some people are vegetarian, and we want to stay inside the shared budget.</textarea>
-</div>
-<div style="display: flex; flex-direction: column; gap: 8px;">
-<label for="room-passcode" style="font-weight: 600; font-size: 14px;">Room passcode</label>
-<input id="room-passcode" type="password" placeholder="Enter the passcode" style="min-height: 48px; padding: 0 14px; border: 1px solid #C9C9C2; border-radius: 8px; font-family: inherit; font-size: 16px; color: #17191E; background: #FFFFFF; max-width: 320px;">
-<p style="margin: 0; font-size: 13px; color: #585D69;">Model calls are paid, so creating a room needs the passcode.</p>
-</div>
-<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 8px; border-top: 1px solid #ECECE7;">
-<span style="font-size: 14px; color: #585D69;">Next, the AI drafts a brief in a few quick passes.</span>
-<a href="#brief" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: 8px; background: #2451C8; color: #FFFFFF; font-weight: 600; font-size: 16px; text-decoration: none;">
-<span>Draft the brief</span>
-<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
-</a>
-</div>
-</form>
-<ul style="list-style: none; margin: 32px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 20px;">
-<li style="flex: 1 1 200px; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: #3D424C;">
-<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#585D69" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 1px;"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></svg>
-<span>Teams join by link, and each sees only what is theirs.</span>
-</li>
-<li style="flex: 1 1 200px; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: #3D424C;">
-<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#585D69" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 1px;"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
-<span>Anything irreversible waits for the named decider.</span>
-</li>
-<li style="flex: 1 1 200px; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: #3D424C;">
-<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#585D69" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 1px;"><path d="M4 7h16M4 12h16M4 17h10"></path></svg>
-<span>Shops, calls, couriers and payments start as mocks.</span>
-</li>
-</ul>
-</main>
-</div>
-</section>
-<section id="brief" class="screen" aria-label="Brief" hidden>
-<div style="min-height: 100%; background: #F5F5F2; color: #17191E; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.5;">
-<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 14px 32px; background: #FFFFFF; border-bottom: 1px solid #E2E2DC;">
-<div style="display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 600; font-size: 18px;">
-<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2451C8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="5" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="12" cy="21" r="2"></circle><path d="M6.5 6.5 9.8 9.8M17.5 6.5 14.2 9.8M12 15v4"></path></svg>
-<span>Orchestrator</span>
-</div>
-<nav aria-label="Room setup steps" style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px;">
-<span style="padding: 6px 12px; border-radius: 999px; color: #585D69;">1 Goal</span>
-<span aria-current="step" style="padding: 6px 12px; border-radius: 999px; background: #E8EEFB; color: #1B3E9C; font-weight: 600;">2 Brief</span>
-<span style="padding: 6px 12px; border-radius: 999px; color: #585D69;">3 Room</span>
-</nav>
-<div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #585D69;">
-<span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: #17191E; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">M</span>
-<span>Mei · host</span>
-</div>
-</header>
-<main style="max-width: 1200px; margin: 0 auto; padding: 48px 32px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 36px;">
-<section style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px;">
-<div style="flex: 999 1 520px; min-width: 0;">
-<p style="margin: 0 0 8px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #585D69;">Brief · Finale dinner for three teams</p>
-<h1 style="margin: 0 0 12px; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 40px; line-height: 1.15; font-weight: 600;">Commit what matters</h1>
-<p style="margin: 0; font-size: 17px; color: #3D424C; max-width: 680px;">The AI ranked what the goal depends on. Commit the ones the room must enforce. Anything left uncommitted is parked when the room starts: kept, not enforced.</p>
-</div>
-<div role="status" style="flex: 1 1 300px; background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;">
-<span style="font-size: 13px; font-weight: 600; color: #585D69;">Drafting in passes</span>
-<div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px;">
-<span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #E8EEFB; color: #1B3E9C; font-weight: 600;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg>Quick draft</span>
-<span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #E8EEFB; color: #1B3E9C; font-weight: 600;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg>Specialists</span>
-<span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px dashed #8A8F99; color: #3D424C;">Ranking…</span>
-</div>
-</div>
-</section>
+<main class="stage" id="stage" aria-label="Three phones"></main>
 
-<section aria-labelledby="params-h" style="display: flex; flex-direction: column; gap: 16px;">
-<div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px;">
-<h2 id="params-h" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; font-weight: 600;">Parameters</h2>
-<span style="font-size: 14px; color: #585D69;">3 committed · 3 suggested · 1 parked</span>
-</div>
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;">
-
-<article style="display: flex; flex-direction: column; gap: 10px; background: #FFFFFF; border: 2px solid #2451C8; border-radius: 12px; padding: 19px;">
-<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-<span style="font-size: 13px; font-weight: 600; color: #585D69;">#1 · Deadline</span>
-<span style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: #2451C8; color: #FFFFFF;">Committed</span>
-</div>
-<p style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 21px; font-weight: 600;">Food arrives by 19:30</p>
-<p style="margin: 0; font-size: 13px; color: #585D69;">From the goal. Enforced as a hard limit.</p>
-<div style="margin-top: auto; display: flex; gap: 8px;"><button type="button" style="min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Uncommit</button></div>
-</article>
-
-<article style="display: flex; flex-direction: column; gap: 10px; background: #FFFFFF; border: 2px solid #2451C8; border-radius: 12px; padding: 19px;">
-<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-<span style="font-size: 13px; font-weight: 600; color: #585D69;">#2 · Budget</span>
-<span style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: #2451C8; color: #FFFFFF;">Committed</span>
-</div>
-<p style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 21px; font-weight: 600;">NT$ 6,000 for everyone</p>
-<p style="margin: 0; font-size: 13px; color: #585D69;">From the goal: “inside the shared budget”.</p>
-<div style="margin-top: auto; display: flex; gap: 8px;"><button type="button" style="min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Uncommit</button></div>
-</article>
-
-<article style="display: flex; flex-direction: column; gap: 10px; background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 20px;">
-<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-<span style="font-size: 13px; font-weight: 600; color: #585D69;">#3 · Headcount</span>
-<span style="font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid #8A8F99; color: #3D424C;">Suggested</span>
-</div>
-<p style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 21px; font-weight: 600;">About 24 people</p>
-<p style="margin: 0; font-size: 13px; color: #585D69;">Three teams. Each team confirms its own count.</p>
-<div style="margin-top: auto; display: flex; gap: 8px;"><button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 0; background: #2451C8; color: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 600;">Commit</button><button type="button" style="min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Park</button></div>
-</article>
-
-<article style="display: flex; flex-direction: column; gap: 10px; background: #FFFFFF; border: 2px solid #2451C8; border-radius: 12px; padding: 19px;">
-<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-<span style="font-size: 13px; font-weight: 600; color: #585D69;">#4 · Dietary needs</span>
-<span style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: #2451C8; color: #FFFFFF;">Committed</span>
-</div>
-<p style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 21px; font-weight: 600;">5 vegetarian meals</p>
-<p style="margin: 0; font-size: 13px; color: #585D69;">From the goal: “some people are vegetarian”.</p>
-<div style="margin-top: auto; display: flex; gap: 8px;"><button type="button" style="min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Uncommit</button></div>
-</article>
-
-<article style="display: flex; flex-direction: column; gap: 10px; background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 20px;">
-<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-<span style="font-size: 13px; font-weight: 600; color: #585D69;">#5 · Delivery</span>
-<span style="font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid #8A8F99; color: #3D424C;">Suggested</span>
-</div>
-<p style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 21px; font-weight: 600;">One courier, two pickups</p>
-<p style="margin: 0; font-size: 13px; color: #585D69;">The courier takes one sender per order, so two shops need a workaround.</p>
-<div style="margin-top: auto; display: flex; gap: 8px;"><button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 0; background: #2451C8; color: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 600;">Commit</button><button type="button" style="min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Park</button></div>
-</article>
-
-<article style="display: flex; flex-direction: column; gap: 10px; background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 20px;">
-<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-<span style="font-size: 13px; font-weight: 600; color: #585D69;">#6 · Payment</span>
-<span style="font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid #8A8F99; color: #3D424C;">Suggested</span>
-</div>
-<p style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 21px; font-weight: 600;">One payment per shop</p>
-<p style="margin: 0; font-size: 13px; color: #585D69;">Paid after the named decider approves.</p>
-<div style="margin-top: auto; display: flex; gap: 8px;"><button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 0; background: #2451C8; color: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 600;">Commit</button><button type="button" style="min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Park</button></div>
-</article>
-
-<article style="display: flex; flex-direction: column; gap: 10px; background: #ECECE7; border: 1px dashed #8A8F99; border-radius: 12px; padding: 20px;">
-<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-<span style="font-size: 13px; font-weight: 600; color: #585D69;">#7 · Allergies</span>
-<span style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: #D9D9D2; color: #3D424C;">Parked</span>
-</div>
-<p style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 21px; font-weight: 600; color: #3D424C;">Peanut-free</p>
-<p style="margin: 0; font-size: 13px; color: #585D69;">Kept for reference. Not enforced.</p>
-<div style="margin-top: auto; display: flex; gap: 8px;"><button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Commit</button></div>
-</article>
-</div>
-</section>
-
-<section aria-labelledby="rules-h" style="display: flex; flex-direction: column; gap: 16px;">
-<h2 id="rules-h" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; font-weight: 600;">How the room should run</h2>
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px;">
-
-<div style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px;">
-<h3 style="margin: 0; font-size: 16px; font-weight: 600;">Criteria</h3>
-<p style="margin: 0; font-size: 13px; font-weight: 600; color: #585D69;">Hard (an option that fails one is out)</p>
-<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px;"><li>Arrives by 19:30</li><li>Total within NT$ 6,000</li><li>At least 5 vegetarian meals</li></ul>
-<p style="margin: 6px 0 0; font-size: 13px; font-weight: 600; color: #585D69;">Soft (used to rank)</p>
-<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px;"><li>Fewer pickups</li><li>Shops the teams already like</li></ul>
-</div>
-
-<div style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px;">
-<h3 style="margin: 0; font-size: 16px; font-weight: 600;">Done means</h3>
-<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px;"><li>Every team has confirmed its order</li><li>Each shop is paid once</li><li>The courier is booked and tracking is shared</li></ul>
-<h3 style="margin: 10px 0 0; font-size: 16px; font-weight: 600;">Scope</h3>
-<p style="margin: 0;"><strong style="font-weight: 600;">In:</strong> choosing shops, ordering, delivery, payment.<br><strong style="font-weight: 600;">Out:</strong> drinks and the venue.</p>
-</div>
-
-<div style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px;">
-<h3 style="margin: 0; font-size: 16px; font-weight: 600;">Teams and who decides</h3>
-<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;">
-<li style="display: flex; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid #ECECE7;"><span>Team Atlas</span><span style="color: #585D69;">Decider: Ray</span></li>
-<li style="display: flex; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid #ECECE7;"><span>Team Birch</span><span style="color: #585D69;">Decider: Lin</span></li>
-<li style="display: flex; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid #ECECE7;"><span>Team Cedar</span><span style="color: #585D69;">Decider: Sam</span></li>
-<li style="display: flex; justify-content: space-between; gap: 8px;"><span>Shared spending</span><span style="color: #585D69;">Decider: Mei</span></li>
-</ul>
-<p style="margin: 0; font-size: 13px; color: #585D69;">Each team's own choices stay with that team's decider.</p>
-</div>
-
-<div style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px;">
-<h3 style="margin: 0; font-size: 16px; font-weight: 600;">How far the agent may go</h3>
-<p style="margin: 0; font-size: 13px; font-weight: 600; color: #585D69;">On its own</p>
-<p style="margin: 0;">Ask teams, propose options, call votes, record decisions, chase late answers.</p>
-<p style="margin: 4px 0 0; font-size: 13px; font-weight: 600; color: #585D69;">Only after the decider approves</p>
-<p style="margin: 0;">Call a shop, book the courier, pay.</p>
-</div>
-
-<div style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px;">
-<h3 style="margin: 0; font-size: 16px; font-weight: 600;">Risks</h3>
-<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px;"><li>Two pickups on one courier order</li><li>Calling a shop in Mandarin is unproven</li><li>A team answers late and holds up the order</li></ul>
-<h3 style="margin: 10px 0 0; font-size: 16px; font-weight: 600;">Rhythm</h3>
-<p style="margin: 0;">A step runs when a question closes. Late answers are chased every 10 minutes.</p>
-</div>
-</div>
-</section>
-
-<section style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 18px 24px;">
-<p style="margin: 0; color: #3D424C;"><strong style="font-weight: 600; color: #17191E;">3 suggestions are still uncommitted.</strong> They will be parked. Starting the room creates an invite link for each team.</p>
-<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-<a href="#goal" style="display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 18px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-weight: 600; text-decoration: none;">Back to goal</a>
-<a href="#room" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: 8px; background: #2451C8; color: #FFFFFF; font-weight: 600; text-decoration: none;"><span>Start the room</span><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
-</div>
-</section>
-</main>
-</div>
-</section>
-<section id="room" class="screen" aria-label="Room (host)" hidden>
-<div style="min-height: 100%; background: #F5F5F2; color: #17191E; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.5;">
-<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 14px 32px; background: #FFFFFF; border-bottom: 1px solid #E2E2DC;">
-<div style="display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 600; font-size: 18px;">
-<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2451C8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="5" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="12" cy="21" r="2"></circle><path d="M6.5 6.5 9.8 9.8M17.5 6.5 14.2 9.8M12 15v4"></path></svg>
-<span>Orchestrator</span>
-</div>
-<nav aria-label="Room setup steps" style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px;">
-<span style="padding: 6px 12px; border-radius: 999px; color: #585D69;">1 Goal</span>
-<span style="padding: 6px 12px; border-radius: 999px; color: #585D69;">2 Brief</span>
-<span aria-current="step" style="padding: 6px 12px; border-radius: 999px; background: #E8EEFB; color: #1B3E9C; font-weight: 600;">3 Room</span>
-</nav>
-<div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #585D69;">
-<span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: #17191E; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">M</span>
-<span>Mei · host</span>
-</div>
-</header>
-<main style="max-width: 1280px; margin: 0 auto; padding: 36px 32px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 28px;">
-<section style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px;">
-<div>
-<h1 style="margin: 0 0 10px; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 34px; line-height: 1.15; font-weight: 600;">Finale dinner for three teams</h1>
-<div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px;">
-<span style="padding: 4px 10px; border-radius: 999px; background: #2451C8; color: #FFFFFF; font-weight: 600;">Room open</span>
-<span style="padding: 3px 9px; border-radius: 999px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #3D424C;">Food by 19:30</span>
-<span style="padding: 3px 9px; border-radius: 999px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #3D424C;">Budget NT$ 6,000</span>
-<span style="padding: 3px 9px; border-radius: 999px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #3D424C;">3 teams · 24 people</span>
-</div>
-</div>
-<p style="margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: #3D424C; background: #ECECE7; padding: 8px 12px; border-radius: 8px;">
-<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-Host view: you see shared items only, like everyone else.
-</p>
-</section>
-
-<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
-<section aria-labelledby="steps-h" style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
-<div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px;">
-<h2 id="steps-h" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; font-weight: 600;">Orchestrator steps</h2>
-<span style="font-size: 13px; color: #585D69;">One typed action per step, checked in code before it runs</span>
-</div>
-
-<article style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
-<span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: #EEF0F3; color: #3D424C;">ask_team</span>
-<span style="font-size: 13px; color: #585D69;">Step 1 · 17:42 · to every team</span>
-<span style="margin-left: auto; font-size: 12px; font-weight: 600; color: #3D424C;">Closed</span>
-</div>
-<p style="margin: 0; font-size: 16px; font-weight: 600;">How many people are eating, and how many need vegetarian meals?</p>
-<div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px;">
-<span style="padding: 3px 9px; border-radius: 6px; background: #E8EEFB; color: #1B3E9C;">Atlas answered</span>
-<span style="padding: 3px 9px; border-radius: 6px; background: #E8EEFB; color: #1B3E9C;">Birch answered</span>
-<span style="padding: 3px 9px; border-radius: 6px; background: #E8EEFB; color: #1B3E9C;">Cedar answered after a reminder at 18:05</span>
-</div>
-<p style="margin: 0; font-size: 14px; color: #3D424C;">Shared total: 24 people, 5 vegetarian. Each team's own answer stays with that team.</p>
-</article>
-
-<article style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
-<span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: #EEF0F3; color: #3D424C;">propose_options</span>
-<span style="font-size: 13px; color: #585D69;">Step 2 · 18:09 · scored against the brief's criteria</span>
-</div>
-<div style="overflow-x: auto; border: 1px solid #ECECE7; border-radius: 8px;">
-<table style="width: 100%; min-width: 640px; border-collapse: collapse; font-size: 14px;">
-<thead>
-<tr style="background: #F5F5F2; text-align: left;">
-<th scope="col" style="padding: 10px 12px; font-weight: 600;">Option</th>
-<th scope="col" style="padding: 10px 12px; font-weight: 600;">Arrives</th>
-<th scope="col" style="padding: 10px 12px; font-weight: 600;">Total</th>
-<th scope="col" style="padding: 10px 12px; font-weight: 600;">Vegetarian</th>
-<th scope="col" style="padding: 10px 12px; font-weight: 600;">Pickups</th>
-<th scope="col" style="padding: 10px 12px; font-weight: 600;">Result</th>
-</tr>
-</thead>
-<tbody>
-<tr style="border-top: 1px solid #ECECE7;">
-<td style="padding: 10px 12px;"><strong style="font-weight: 600;">A</strong> · Shop A noodles + Shop B veggie bento, one courier, two stops</td>
-<td style="padding: 10px 12px;">✓ 19:20</td>
-<td style="padding: 10px 12px;">✓ NT$ 4,780</td>
-<td style="padding: 10px 12px;">✓ 5</td>
-<td style="padding: 10px 12px;">2</td>
-<td style="padding: 10px 12px;"><span style="font-weight: 600; color: #1B3E9C;">Ranked first</span></td>
-</tr>
-<tr style="border-top: 1px solid #ECECE7; color: #585D69;">
-<td style="padding: 10px 12px;"><strong style="font-weight: 600;">B</strong> · One bento shop, one pickup</td>
-<td style="padding: 10px 12px;">✓ 19:10</td>
-<td style="padding: 10px 12px;">✓ NT$ 4,320</td>
-<td style="padding: 10px 12px; color: #A3400D; font-weight: 600;">✗ only 3</td>
-<td style="padding: 10px 12px;">1</td>
-<td style="padding: 10px 12px;">Out: fails a hard criterion</td>
-</tr>
-<tr style="border-top: 1px solid #ECECE7; color: #585D69;">
-<td style="padding: 10px 12px;"><strong style="font-weight: 600;">C</strong> · Two shops, two couriers</td>
-<td style="padding: 10px 12px;">✓ 19:15</td>
-<td style="padding: 10px 12px; color: #A3400D; font-weight: 600;">✗ NT$ 6,350</td>
-<td style="padding: 10px 12px;">✓ 5</td>
-<td style="padding: 10px 12px;">2</td>
-<td style="padding: 10px 12px;">Out: over budget</td>
-</tr>
-</tbody>
-</table>
-</div>
-</article>
-
-<article style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
-<span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: #EEF0F3; color: #3D424C;">call_vote</span>
-<span style="font-size: 13px; color: #585D69;">Step 3 · 18:11 · every team</span>
-<span style="margin-left: auto; font-size: 12px; font-weight: 600; color: #3D424C;">Closed · 3 of 3 voted</span>
-</div>
-<p style="margin: 0; font-size: 16px; font-weight: 600;">Go with option A?</p>
-<div style="display: flex; align-items: center; gap: 10px;">
-<div aria-hidden="true" style="flex: 1; height: 10px; border-radius: 999px; background: #ECECE7; overflow: hidden;"><div style="width: 100%; height: 10px; background: #2451C8;"></div></div>
-<span style="font-size: 14px; color: #3D424C;">Yes 3 · No 0</span>
-</div>
-</article>
-
-<article style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
-<span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: #EEF0F3; color: #3D424C;">record_decision</span>
-<span style="font-size: 13px; color: #585D69;">Step 4 · 18:16 · after the vote closed</span>
-</div>
-<p style="margin: 0; font-size: 16px; font-weight: 600;">Decided: option A, two shops and one courier with two stops.</p>
-</article>
-
-<article style="background: #FFFFFF; border: 2px solid #B4470F; border-radius: 12px; padding: 17px 19px; display: flex; flex-direction: column; gap: 12px;">
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
-<span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: #FCEEE5; color: #8A3409;">request_approval</span>
-<span style="font-size: 13px; color: #585D69;">Step 5 · 18:21 · now</span>
-<span style="margin-left: auto; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: #B4470F; color: #FFFFFF;">Waiting for Mei</span>
-</div>
-<p style="margin: 0; font-size: 16px; font-weight: 600;">Pay Shop A and Shop B, NT$ 4,780 in total</p>
-<p style="margin: 0; font-size: 14px; color: #3D424C;">Irreversible, so it waits for the decider named in the brief and runs once. Team Cedar has one open concern, which blocks approval until it is resolved.</p>
-<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-<a href="#approval" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 8px; background: #B4470F; color: #FFFFFF; font-weight: 600; text-decoration: none;">Review the approval</a>
-<span style="display: inline-flex; align-items: center; font-size: 13px; color: #585D69;">Next queued: book the courier (also needs approval)</span>
-</div>
-</article>
-</section>
-
-<aside aria-label="Room status" style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
-<section aria-labelledby="teams-h" style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
-<h2 id="teams-h" style="margin: 0; font-size: 16px; font-weight: 600;">Teams</h2>
-<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px;">
-<li style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;"><span><strong style="font-weight: 600;">Atlas</strong> <span style="color: #585D69;">· Ray decides</span></span><span style="font-size: 13px; color: #1B3E9C; font-weight: 600;">Up to date</span></li>
-<li style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;"><span><strong style="font-weight: 600;">Birch</strong> <span style="color: #585D69;">· Lin decides</span></span><span style="font-size: 13px; color: #1B3E9C; font-weight: 600;">Up to date</span></li>
-<li style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;"><span><strong style="font-weight: 600;">Cedar</strong> <span style="color: #585D69;">· Sam decides</span></span><span style="font-size: 13px; color: #8A3409; font-weight: 600;">1 open concern</span></li>
-</ul>
-<button type="button" style="min-height: 44px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Copy invite links</button>
-</section>
-
-<section aria-labelledby="done-h" style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
-<h2 id="done-h" style="margin: 0; font-size: 16px; font-weight: 600;">Done means</h2>
-<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px;">
-<li style="display: flex; gap: 10px; align-items: flex-start;"><span aria-hidden="true" style="flex: none; width: 18px; height: 18px; margin-top: 1px; border-radius: 4px; border: 2px solid #8A8F99; box-sizing: border-box;"></span><span>Every team has confirmed its order <span style="color: #585D69;">(2 of 3)</span></span></li>
-<li style="display: flex; gap: 10px; align-items: flex-start;"><span aria-hidden="true" style="flex: none; width: 18px; height: 18px; margin-top: 1px; border-radius: 4px; border: 2px solid #8A8F99; box-sizing: border-box;"></span><span>Each shop is paid once <span style="color: #585D69;">(waiting for approval)</span></span></li>
-<li style="display: flex; gap: 10px; align-items: flex-start;"><span aria-hidden="true" style="flex: none; width: 18px; height: 18px; margin-top: 1px; border-radius: 4px; border: 2px solid #8A8F99; box-sizing: border-box;"></span><span>Courier booked and tracking shared</span></li>
-</ul>
-</section>
-
-<section aria-labelledby="log-h" style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
-<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px;">
-<h2 id="log-h" style="margin: 0; font-size: 16px; font-weight: 600;">Event log</h2>
-<span style="font-size: 12px; color: #585D69;">Append-only, hash-chained</span>
-</div>
-<ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
-<li style="display: flex; flex-direction: column; gap: 2px;"><span>18:21 · approval requested</span><span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #585D69;">#c41e…9a0 ← #7b02…e13</span></li>
-<li style="display: flex; flex-direction: column; gap: 2px;"><span>18:16 · decision recorded</span><span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #585D69;">#7b02…e13 ← #19fa…4c7</span></li>
-<li style="display: flex; flex-direction: column; gap: 2px;"><span>18:14 · vote closed</span><span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #585D69;">#19fa…4c7 ← #e08d…b52</span></li>
-</ol>
-<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-<button type="button" style="flex: 1 1 140px; min-height: 44px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Export host view</button>
-<a href="#done" style="flex: 1 1 140px; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-size: 14px; font-weight: 600; text-decoration: none;">Finish the room</a>
-</div>
-</section>
-</aside>
-</div>
-</main>
-</div>
-</section>
-<section id="team" class="screen" aria-label="Room (Team Cedar)" hidden>
-<div style="min-height: 100%; background: #F5F5F2; color: #17191E; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.5;">
-<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 14px 32px; background: #FFFFFF; border-bottom: 1px solid #E2E2DC;">
-<div style="display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 600; font-size: 18px;">
-<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2451C8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="5" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="12" cy="21" r="2"></circle><path d="M6.5 6.5 9.8 9.8M17.5 6.5 14.2 9.8M12 15v4"></path></svg>
-<span>Orchestrator</span>
-</div>
-<span style="font-size: 14px; font-weight: 600; padding: 6px 12px; border-radius: 999px; background: #17191E; color: #FFFFFF;">Team Cedar</span>
-<div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #585D69;">
-<span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: #0F6E7A; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">S</span>
-<span>Sam · Cedar's decider</span>
-</div>
-</header>
-<main style="max-width: 1200px; margin: 0 auto; padding: 36px 32px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px;">
-<section>
-<h1 style="margin: 0 0 10px; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 34px; line-height: 1.15; font-weight: 600;">Finale dinner for three teams</h1>
-<p style="margin: 0 0 14px; font-size: 16px; color: #3D424C; max-width: 720px;">You see Team Cedar's items and the items shared with everyone. Other teams and the host never see Cedar's items.</p>
-<div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px;">
-<span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #17191E; color: #FFFFFF; font-weight: 600;"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>Only Team Cedar</span>
-<span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; border: 1px solid #8A8F99; background: #FFFFFF; color: #3D424C; font-weight: 600;">Shared with everyone</span>
-</div>
-</section>
-
-<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
-<section aria-label="Cedar's items" style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
-
-<article style="background: #FFFFFF; border: 2px solid #17191E; border-radius: 12px; padding: 19px; display: flex; flex-direction: column; gap: 12px;">
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
-<span style="font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #17191E; color: #FFFFFF;">Only Team Cedar</span>
-<span style="font-size: 13px; color: #585D69;">Needs Sam's approval</span>
-</div>
-<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 20px; font-weight: 600;">Cedar's order: 6 beef noodles, 2 vegetarian bento</h2>
-<p style="margin: 0; font-size: 14px; color: #3D424C;">Drafted by the orchestrator from your team's answers. It is your team's own choice, so it stays with Cedar and Sam approves it.</p>
-<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-<button type="button" style="min-height: 44px; padding: 0 18px; border-radius: 8px; border: 0; background: #2451C8; color: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 600;">Approve for Cedar</button>
-<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Change the order</button>
-</div>
-</article>
-
-<article style="background: #FFFFFF; border: 2px solid #B4470F; border-radius: 12px; padding: 19px; display: flex; flex-direction: column; gap: 12px;">
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
-<span style="font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #17191E; color: #FFFFFF;">Only Team Cedar</span>
-<span style="font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #FCEEE5; color: #8A3409;">Open concern</span>
-<span style="font-size: 13px; color: #585D69;">Raised by Ana · 18:19</span>
-</div>
-<p style="margin: 0; font-size: 16px; font-weight: 600;">Can the vegetarian bento be egg-free?</p>
-<p style="margin: 0; font-size: 14px; color: #3D424C;">While this is open, the payment approval is blocked. The host sees that a concern is open, not what it says.</p>
-<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Reply</button>
-<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Mark resolved</button>
-</div>
-</article>
-
-<article style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
-<span style="font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #17191E; color: #FFFFFF;">Only Team Cedar</span>
-<span style="font-size: 13px; color: #585D69;">Answered 18:07, after a reminder</span>
-</div>
-<p style="margin: 0; font-size: 16px; font-weight: 600;">How many people are eating, and how many need vegetarian meals?</p>
-<div style="display: flex; flex-wrap: wrap; gap: 16px;">
-<div style="display: flex; flex-direction: column; gap: 6px;">
-<label for="cedar-people" style="font-size: 14px; font-weight: 600;">People</label>
-<input id="cedar-people" type="number" value="8" style="width: 120px; min-height: 44px; padding: 0 12px; border: 1px solid #C9C9C2; border-radius: 8px; font-family: inherit; font-size: 16px; color: #17191E; background: #FFFFFF;">
-</div>
-<div style="display: flex; flex-direction: column; gap: 6px;">
-<label for="cedar-veg" style="font-size: 14px; font-weight: 600;">Vegetarian</label>
-<input id="cedar-veg" type="number" value="2" style="width: 120px; min-height: 44px; padding: 0 12px; border: 1px solid #C9C9C2; border-radius: 8px; font-family: inherit; font-size: 16px; color: #17191E; background: #FFFFFF;">
-</div>
-<div style="display: flex; align-items: flex-end;">
-<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 14px; font-weight: 600;">Update answer</button>
-</div>
-</div>
-</article>
-
-<article style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px;">
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;">
-<span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid #8A8F99; color: #3D424C;">Shared with everyone</span>
-<span style="font-size: 13px; color: #585D69;">18:16</span>
-</div>
-<p style="margin: 0; font-size: 16px; font-weight: 600;">Decided: option A, two shops and one courier with two stops.</p>
-<p style="margin: 0; font-size: 14px; color: #3D424C;">Cedar voted yes. All three teams voted yes.</p>
-</article>
-</section>
-
-<aside aria-label="About this view" style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
-<section aria-labelledby="who-h" style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
-<h2 id="who-h" style="margin: 0; font-size: 16px; font-weight: 600;">Who sees what</h2>
-<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px;">
-<li style="display: flex; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #ECECE7;"><span>Team Cedar</span><span style="color: #585D69; text-align: right;">Cedar items + shared</span></li>
-<li style="display: flex; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #ECECE7;"><span>Atlas and Birch</span><span style="color: #585D69; text-align: right;">Shared only</span></li>
-<li style="display: flex; justify-content: space-between; gap: 8px;"><span>Host</span><span style="color: #585D69; text-align: right;">Shared only, no exception</span></li>
-</ul>
-<p style="margin: 0; font-size: 13px; color: #585D69;">Every event reaches a screen through one visibility check.</p>
-</section>
-
-<section aria-labelledby="agent-h" style="background: #FFFFFF; border: 1px dashed #8A8F99; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
-<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-<h2 id="agent-h" style="margin: 0; font-size: 16px; font-weight: 600;">Bring your own agent</h2>
-<span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #ECECE7; color: #3D424C;">Stretch</span>
-</div>
-<p style="margin: 0; font-size: 14px; color: #3D424C;">Connect your own AI agent over MCP so it can answer for you. What it says is treated as data: it can inform the orchestrator but never change the goal or anyone's rights.</p>
-<button type="button" disabled style="min-height: 44px; border-radius: 8px; border: 1px solid #C9C9C2; background: #F5F5F2; color: #585D69; font-family: inherit; font-size: 14px; font-weight: 600;">Connect an agent (later)</button>
-</section>
-</aside>
-</div>
-</main>
-</div>
-</section>
-<section id="approval" class="screen" aria-label="Approval" hidden>
-<div style="min-height: 100%; background: #F5F5F2; color: #17191E; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.5;">
-<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 14px 32px; background: #FFFFFF; border-bottom: 1px solid #E2E2DC;">
-<div style="display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 600; font-size: 18px;">
-<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2451C8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="5" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="12" cy="21" r="2"></circle><path d="M6.5 6.5 9.8 9.8M17.5 6.5 14.2 9.8M12 15v4"></path></svg>
-<span>Orchestrator</span>
-</div>
-<nav aria-label="Breadcrumb" style="font-size: 14px; color: #585D69;"><a href="#room">Finale dinner for three teams</a> <span aria-hidden="true">›</span> <span>Approval</span></nav>
-<div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #585D69;">
-<span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: #17191E; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">M</span>
-<span>Mei · decider for shared spending</span>
-</div>
-</header>
-<main style="max-width: 880px; margin: 0 auto; padding: 40px 32px 56px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px;">
-<div>
-<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: #B4470F; color: #FFFFFF;"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>Irreversible · runs once</span>
-<h1 style="margin: 14px 0 8px; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 34px; line-height: 1.15; font-weight: 600;">Pay Shop A and Shop B for tonight's dinner</h1>
-<p style="margin: 0; font-size: 16px; color: #3D424C;">Requested by the orchestrator at step 5. The brief names Mei as the decider for shared spending.</p>
-</div>
-
-<section aria-labelledby="what-h" style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;">
-<h2 id="what-h" style="margin: 0; font-size: 16px; font-weight: 600;">What will run</h2>
-<dl style="margin: 0; display: grid; grid-template-columns: minmax(140px, max-content) 1fr; gap: 10px 24px; font-size: 15px;">
-<dt style="color: #585D69;">Action</dt><dd style="margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px;">payment.pay × 2</dd>
-<dt style="color: #585D69;">Shop A · beef noodles</dt><dd style="margin: 0;">NT$ 3,060</dd>
-<dt style="color: #585D69;">Shop B · vegetarian bento</dt><dd style="margin: 0;">NT$ 1,720</dd>
-<dt style="color: #585D69; font-weight: 600;">Total</dt><dd style="margin: 0; font-weight: 600;">NT$ 4,780</dd>
-<dt style="color: #585D69;">Approval id</dt><dd style="margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px;">apr_7Q2KX9</dd>
-</dl>
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid #ECECE7;">
-<span style="font-size: 13px; color: #585D69; margin-right: 4px;">Payment adapter mode</span>
-<span style="font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 6px; background: #2451C8; color: #FFFFFF;">Mock</span>
-<span style="font-size: 13px; padding: 3px 9px; border-radius: 6px; border: 1px solid #C9C9C2; color: #585D69;">Sandbox</span>
-<span style="font-size: 13px; padding: 3px 9px; border-radius: 6px; border: 1px solid #C9C9C2; color: #585D69;">Live</span>
-<span style="font-size: 13px; padding: 3px 9px; border-radius: 6px; border: 1px solid #C9C9C2; color: #585D69;">Manual</span>
-</div>
-</section>
-
-<section aria-labelledby="checks-h" style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px;">
-<h2 id="checks-h" style="margin: 0; font-size: 16px; font-weight: 600;">Checked in code before it can run</h2>
-<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px;">
-<li style="display: flex; gap: 10px; align-items: flex-start;"><span aria-hidden="true" style="flex: none; color: #1B3E9C; font-weight: 600;">✓</span><span>Within budget: NT$ 4,780 of NT$ 6,000</span></li>
-<li style="display: flex; gap: 10px; align-items: flex-start;"><span aria-hidden="true" style="flex: none; color: #1B3E9C; font-weight: 600;">✓</span><span>Before the deadline: courier arrives about 19:20</span></li>
-<li style="display: flex; gap: 10px; align-items: flex-start;"><span aria-hidden="true" style="flex: none; color: #1B3E9C; font-weight: 600;">✓</span><span>Hard criteria met: 5 vegetarian meals</span></li>
-<li style="display: flex; gap: 10px; align-items: flex-start;"><span aria-hidden="true" style="flex: none; color: #1B3E9C; font-weight: 600;">✓</span><span>Decision rights: Mei decides shared spending</span></li>
-<li data-show="blocked" style="display: flex; gap: 10px; align-items: flex-start; color: #8A3409;"><span aria-hidden="true" style="flex: none; font-weight: 600;">!</span><span><strong style="font-weight: 600;">Open concerns: 1.</strong> Team Cedar has an open concern. Only Cedar can see it, and Sam resolves it.</span></li>
-<li data-show="clear" style="display: flex; gap: 10px; align-items: flex-start;"><span aria-hidden="true" style="flex: none; color: #1B3E9C; font-weight: 600;">✓</span><span>No open concerns</span></li>
-</ul>
-</section>
-
-<section aria-label="Decision" style="display: flex; flex-direction: column; gap: 12px;">
-<div data-show="ran" style="display: contents;">
-<div role="status" style="background: #E8EEFB; border: 1px solid #B9C8F0; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px;">
-<p style="margin: 0; font-size: 16px; font-weight: 600; color: #132C70;">Paid once. Approval apr_7Q2KX9 has been used.</p>
-<p style="margin: 0; font-size: 14px; color: #1B3E9C;">Both payments went through the mock adapter. The room moves on to booking the courier.</p>
-<div data-show="duplicate" style="display: contents;">
-<p style="margin: 6px 0 0; font-size: 14px; color: #132C70;"><strong style="font-weight: 600;">You approved again, and nothing ran.</strong> An approval id runs its action once.</p>
-</div>
-</div>
-</div>
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
-<div data-show="blocked" style="display: contents;">
-<button type="button" disabled style="min-height: 48px; padding: 0 22px; border-radius: 8px; border: 0; background: #D9D9D2; color: #585D69; font-family: inherit; font-size: 16px; font-weight: 600;">Approve and pay</button>
-<span style="font-size: 14px; color: #8A3409;">Blocked until Team Cedar resolves its concern.</span>
-</div>
-<div data-show="clear" style="display: contents;">
-<button type="button" id="approve-btn" style="min-height: 48px; padding: 0 22px; border-radius: 8px; border: 0; background: #B4470F; color: #FFFFFF; font-family: inherit; font-size: 16px; font-weight: 600;">Approve and pay</button>
-</div>
-<div data-show="notRan" style="display: contents;">
-<button type="button" style="min-height: 48px; padding: 0 18px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-family: inherit; font-size: 15px; font-weight: 600;">Reject</button>
-</div>
-<a href="#room" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 8px; font-size: 15px; font-weight: 600;">Back to the room</a>
-</div>
-</section>
-</main>
-</div>
-</section>
-<section id="done" class="screen" aria-label="Done" hidden>
-<div style="min-height: 100%; background: #F5F5F2; color: #17191E; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.5;">
-<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 14px 32px; background: #FFFFFF; border-bottom: 1px solid #E2E2DC;">
-<div style="display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 600; font-size: 18px;">
-<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2451C8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="5" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="12" cy="21" r="2"></circle><path d="M6.5 6.5 9.8 9.8M17.5 6.5 14.2 9.8M12 15v4"></path></svg>
-<span>Orchestrator</span>
-</div>
-<nav aria-label="Breadcrumb" style="font-size: 14px; color: #585D69;"><a href="#room">Finale dinner for three teams</a> <span aria-hidden="true">›</span> <span>Finished</span></nav>
-<div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #585D69;">
-<span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: #17191E; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">M</span>
-<span>Mei · host</span>
-</div>
-</header>
-<main style="max-width: 1040px; margin: 0 auto; padding: 44px 32px 56px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px;">
-<div>
-<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: #2451C8; color: #FFFFFF;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg>Room finished</span>
-<h1 style="margin: 14px 0 8px; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 36px; line-height: 1.15; font-weight: 600;">Every “done means” item is ticked</h1>
-<p style="margin: 0; font-size: 16px; color: #3D424C; max-width: 680px;">Dinner for 24 people is on the way, and the courier is due about 19:20. This summary shows shared items only.</p>
-</div>
-
-<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;">
-<section aria-labelledby="done-h" style="flex: 999 1 520px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;">
-<h2 id="done-h" style="margin: 0; font-size: 16px; font-weight: 600;">Done means</h2>
-<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px;">
-<li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex: none; width: 20px; height: 20px; border-radius: 5px; background: #2451C8; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span><span><strong style="font-weight: 600;">Every team has confirmed its order.</strong> <span style="color: #585D69;">3 of 3 teams.</span></span></li>
-<li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex: none; width: 20px; height: 20px; border-radius: 5px; background: #2451C8; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span><span><strong style="font-weight: 600;">Each shop is paid once.</strong> <span style="color: #585D69;">Approval <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;">apr_7Q2KX9</span>, mock adapter.</span></span></li>
-<li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex: none; width: 20px; height: 20px; border-radius: 5px; background: #2451C8; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span><span><strong style="font-weight: 600;">The courier is booked and tracking is shared.</strong> <span style="color: #585D69;">Approval <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;">apr_3MZ81C</span>, mock adapter.</span></span></li>
-</ul>
-</section>
-
-<section aria-labelledby="export-h" style="flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px;">
-<h2 id="export-h" style="margin: 0; font-size: 16px; font-weight: 600;">Host export</h2>
-<p style="margin: 0; font-size: 14px; color: #3D424C;">Contains what the host can see, plus every event's hash, so anyone can check the log without seeing team data.</p>
-<button type="button" style="min-height: 48px; border-radius: 8px; border: 0; background: #2451C8; color: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 600;">Download the export</button>
-</section>
-</div>
-
-<section aria-labelledby="decisions-h" style="background: #FFFFFF; border: 1px solid #E2E2DC; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px;">
-<h2 id="decisions-h" style="margin: 0; font-size: 16px; font-weight: 600;">Shared decisions</h2>
-<ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;">
-<li style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 10px 0; border-bottom: 1px solid #ECECE7;"><span>Option A: two shops and one courier with two stops</span><span style="color: #585D69; font-size: 14px;">18:16 · vote 3 of 3</span></li>
-<li style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 10px 0; border-bottom: 1px solid #ECECE7;"><span>Pay Shop A and Shop B, NT$ 4,780</span><span style="color: #585D69; font-size: 14px;">18:31 · approved by Mei</span></li>
-<li style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 10px 0;"><span>Book one courier with two pickups</span><span style="color: #585D69; font-size: 14px;">18:36 · approved by Mei</span></li>
-</ol>
-<p style="margin: 0; font-size: 13px; color: #585D69;">Each team's own decisions, such as its order, stay within that team.</p>
-</section>
-
-<section aria-labelledby="parked-h" style="background: #ECECE7; border: 1px dashed #8A8F99; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px;">
-<h2 id="parked-h" style="margin: 0; font-size: 16px; font-weight: 600;">Parked when the room started</h2>
-<p style="margin: 0; font-size: 14px; color: #3D424C;">Kept for reference, never enforced: about 24 people · one courier, two pickups · one payment per shop · peanut-free.</p>
-</section>
-
-<div style="display: flex; flex-wrap: wrap; gap: 10px;">
-<a href="#goal" style="display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 20px; border-radius: 8px; border: 1px solid #C9C9C2; background: #FFFFFF; color: #17191E; font-weight: 600; text-decoration: none;">Start a new room</a>
-<a href="#room" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 8px; font-weight: 600;">Back to the room</a>
-</div>
-</main>
-</div>
-</section>
 <script>
 (function () {
-  var ids = ['goal', 'brief', 'room', 'team', 'approval', 'done'];
-  var state = { concernOpen: true, runs: 0, tries: 0 };
-  function show() {
-    var id = (location.hash || '#goal').slice(1);
-    if (ids.indexOf(id) < 0) id = 'goal';
-    ids.forEach(function (s) { document.getElementById(s).hidden = s !== id; });
-    document.querySelectorAll('[data-nav]').forEach(function (a) {
-      if (a.getAttribute('data-nav') === id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-    });
-    document.getElementById('concern-toggle').hidden = id !== 'approval';
-    window.scrollTo(0, 0);
+var PEOPLE = {
+  Mei: { name: 'Mei', color: '#222222', label: 'Starts the topic' },
+  Ray: { name: 'Ray', color: '#0E7C86', label: 'Invited' },
+  Lin: { name: 'Lin', color: '#B5541B', label: 'Invited' }
+};
+var ORDER = ['Mei', 'Ray', 'Lin'];
+var QS = [
+  { q: 'When does this need to be settled?', k: 'Settle by', chips: ['Tonight', 'This week', 'No rush'] },
+  { q: 'Is there a budget to stay within?', k: 'Budget', chips: ['Under NT$ 5,000', 'NT$ 5,000–10,000', 'No budget'] },
+  { q: 'Who should be in the room?', k: 'People', chips: ['Ray and Lin', 'Ray, Lin and their teams'] },
+  { q: 'How do we make the final call?', k: 'Final call', chips: ['I decide', 'We vote', 'AI suggests, I approve'] }
+];
+var EXAMPLES = ['Dinner for the three teams tonight', 'Pick a venue for Friday', 'Split a group order'];
+
+var S;
+function fresh() {
+  S = { step: 'topic', topic: '', answers: [], created: false, joined: { Ray: false, Lin: false }, messages: [], typing: false };
+}
+fresh();
+
+function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function title() { return S.topic.trim() || 'New room'; }
+var ARROW = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>';
+var BACK = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>';
+var SPARK = '<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z"></path></svg>';
+var LOCK = '<svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>';
+
+function avatar(p, pending) { return '<span class="av' + (pending ? ' pending' : '') + '" style="background:' + PEOPLE[p].color + '" title="' + p + '">' + p.charAt(0) + '</span>'; }
+function members() { return ['Mei'].concat(['Ray', 'Lin'].filter(function (p) { return S.joined[p]; })); }
+
+/* ---------- AI (scripted for the demo) ---------- */
+function aiSay(msgs, delay) {
+  S.typing = true; render();
+  setTimeout(function () { S.typing = false; msgs.forEach(function (m) { S.messages.push(m); }); render(); }, delay || 900);
+}
+function createRoom() {
+  S.created = true; S.step = 'room';
+  S.messages.push({ kind: 'system', text: 'Mei created the room' });
+  S.messages.push({ kind: 'brief' });
+  S.messages.push({ kind: 'private', to: 'Mei', text: 'You have the final say here. Anything that costs money or can\'t be undone waits for your approval, and runs once.' });
+  render();
+  aiSay([{ kind: 'ai', text: 'I\'ve invited Ray and Lin. Once they join, I\'ll ask what each of them needs and come back with options that fit your brief.' }]);
+}
+function join(p) {
+  S.joined[p] = true;
+  S.messages.push({ kind: 'system', text: p + ' joined' });
+  S.messages.push({ kind: 'private', to: p, text: 'Only you see this. Tell me anything you\'d rather not share with the room. I\'ll take it into account without showing it to anyone.' });
+  render();
+  if (S.joined.Ray && S.joined.Lin) {
+    aiSay([{ kind: 'ai', text: 'Everyone\'s here. Ray, Lin: what matters most to you for “' + title() + '”? Reply here and I\'ll pull it together for Mei.' }], 1100);
   }
-  function renderApproval() {
-    var flags = { blocked: state.concernOpen, clear: !state.concernOpen, ran: state.runs > 0,
-                  notRan: state.runs === 0, duplicate: state.tries > 1 };
-    document.querySelectorAll('#approval [data-show]').forEach(function (el) {
-      if (el.dataset.display === undefined) el.dataset.display = el.style.display;
-      el.style.display = flags[el.getAttribute('data-show')] ? el.dataset.display : 'none';
-    });
-    document.getElementById('approve-btn').textContent = state.runs > 0 ? 'Approve again' : 'Approve and pay';
+}
+function post(from, text) {
+  text = text.trim(); if (!text) return;
+  S.messages.push({ kind: 'user', from: from, text: text });
+  render(from);
+}
+
+/* ---------- screens ---------- */
+function hostTopic() {
+  return '<div class="appbar"><div class="avatars">' + avatar('Mei') + '</div><div style="flex:1"></div><span class="eyebrow">New topic</span></div>' +
+    '<div class="body">' +
+    '<p class="eyebrow" style="margin-top:6px">Hi Mei</p>' +
+    '<h1 class="h1">What do you want to decide together?</h1>' +
+    '<p class="lead">Describe it in a sentence. The AI asks a few questions, then opens a chat room for everyone.</p>' +
+    '<div class="field"><label for="topic">Topic</label><textarea id="topic" class="input" placeholder="e.g. Dinner for the three teams tonight">' + esc(S.topic) + '</textarea></div>' +
+    '<p class="eyebrow">Try one</p><div class="chips">' + EXAMPLES.map(function (e) { return '<button type="button" class="chip" data-act="example" data-val="' + esc(e) + '">' + esc(e) + '</button>'; }).join('') + '</div>' +
+    '</div>' +
+    '<div class="foot"><button type="button" class="primary" data-act="to-questions"' + (S.topic.trim() ? '' : ' disabled') + '>Continue</button></div>';
+}
+function hostQuestions() {
+  var n = S.answers.length, cur = n < QS.length ? QS[n] : null, h = [];
+  h.push('<div class="appbar"><button type="button" class="icon-btn" data-act="back-topic" aria-label="Back">' + BACK + '</button><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:700">Set up the room</div><div style="font-size:12px;color:var(--muted)">' + (cur ? 'Question ' + (n + 1) + ' of ' + QS.length : 'All set') + '</div></div></div>');
+  h.push('<div class="progress" aria-hidden="true"><div style="width:' + Math.round(n / QS.length * 100) + '%"></div></div>');
+  h.push('<div class="chat"><div class="chat-inner">');
+  h.push('<div class="msg right"><div class="bubble b-mine">' + esc(title()) + '</div></div>');
+  S.answers.forEach(function (a, i) {
+    h.push('<div class="msg left"><div class="ai-who"><span class="ai-dot">' + SPARK + '</span>Orchestrator</div><div class="bubble b-ai">' + esc(QS[i].q) + '</div></div>');
+    h.push('<div class="msg right"><div class="bubble b-mine">' + esc(a) + '</div></div>');
+  });
+  if (cur) {
+    h.push('<div class="msg left"><div class="ai-who"><span class="ai-dot">' + SPARK + '</span>Orchestrator</div><div class="bubble b-ai" style="font-weight:700">' + esc(cur.q) + '</div></div>');
+    h.push('<div class="chips" role="group" aria-label="Suggested answers">' + cur.chips.map(function (c) { return '<button type="button" class="chip" data-act="answer" data-val="' + esc(c) + '">' + esc(c) + '</button>'; }).join('') + '</div>');
+  } else {
+    h.push(briefCard(true));
   }
-  document.getElementById('approve-btn').addEventListener('click', function () {
-    state.runs = 1; state.tries += 1; renderApproval();
+  h.push('</div></div>');
+  if (cur) h.push('<div class="foot"><div class="row"><label for="ans-Mei" class="sr">Your own answer</label><input id="ans-Mei" class="input" type="text" placeholder="Or type your own answer" data-enter="answer"><button type="button" class="send" data-act="answer-typed" aria-label="Send answer">' + ARROW + '</button></div></div>');
+  else h.push('<div class="foot"><button type="button" class="primary" data-act="create">Create chat room</button></div>');
+  return h.join('');
+}
+function briefCard(editable) {
+  return '<div class="card"><h3>' + esc(title()) + '</h3>' + S.answers.map(function (a, i) { return '<div class="kv"><span>' + esc(QS[i].k) + '</span><span>' + esc(a) + '</span></div>'; }).join('') +
+    (editable ? '<button type="button" class="ghost" data-act="redo" style="align-self:flex-start">Change answers</button>' : '') + '</div>';
+}
+function guestInvite(p) {
+  var h = '<div class="appbar"><div class="avatars">' + avatar(p) + '</div><div style="flex:1"></div><span class="eyebrow">Invitation</span></div><div class="body">';
+  h += '<div class="invite-hero"><span class="host-av" aria-hidden="true">M</span>' +
+       '<div><p class="eyebrow" style="color:#7A2A3B">Mei invited you</p><h1 class="h1" style="font-size:24px;margin-top:6px">' + (S.created ? esc(title()) : 'A new room') + '</h1></div>' +
+       (S.created ? '' : '<div class="waiting"><span class="spinner" aria-hidden="true"></span>Mei is still setting it up…</div>') + '</div>';
+  if (S.created) {
+    h += '<div class="card" style="gap:6px">' + S.answers.map(function (a, i) { return '<div class="kv" style="' + (i === 0 ? 'border-top:0;padding-top:0' : '') + '"><span>' + esc(QS[i].k) + '</span><span>' + esc(a) + '</span></div>'; }).join('') + '</div>';
+    h += '<div class="row" style="gap:12px"><div class="avatars">' + avatar('Mei') + avatar('Ray', !S.joined.Ray) + avatar('Lin', !S.joined.Lin) + '</div><span style="font-size:13px;color:var(--muted)">' + members().length + ' of 3 in the room</span></div>';
+  }
+  h += '<p class="lead" style="font-size:14px">In the room you see shared messages and your own items. Nobody else sees what\'s marked “Only you”.</p></div>';
+  h += '<div class="foot"><button type="button" class="primary" data-act="join" data-who="' + p + '"' + (S.created ? '' : ' disabled') + '>' + (S.created ? 'Join the chat' : 'Waiting for Mei') + '</button></div>';
+  return h;
+}
+function chat(p) {
+  var h = '<div class="appbar bordered"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(title()) + '</div><div style="font-size:12px;color:var(--muted)">' + members().join(', ') + '</div></div><div class="avatars">' + avatar('Mei') + avatar('Ray', !S.joined.Ray) + avatar('Lin', !S.joined.Lin) + '</div></div>';
+  h += '<div class="chat"><div class="chat-inner">';
+  S.messages.forEach(function (m) {
+    if (m.kind === 'private' && m.to !== p) return;
+    if (m.kind === 'system') h += '<p class="sys">' + esc(m.text) + '</p>';
+    else if (m.kind === 'brief') h += '<div class="msg left" style="max-width:100%;align-self:stretch"><div class="ai-who"><span class="ai-dot">' + SPARK + '</span>Orchestrator · room brief</div>' + briefCard(false) + '</div>';
+    else if (m.kind === 'ai') h += '<div class="msg left"><div class="ai-who"><span class="ai-dot">' + SPARK + '</span>Orchestrator</div><div class="bubble b-ai">' + esc(m.text) + '</div></div>';
+    else if (m.kind === 'private') h += '<div class="private"><span class="pill">' + LOCK + 'Only you</span>' + esc(m.text) + '</div>';
+    else if (m.from === p) h += '<div class="msg right"><div class="bubble b-mine">' + esc(m.text) + '</div></div>';
+    else h += '<div class="msg left"><div class="who">' + esc(m.from) + '</div><div class="bubble b-other">' + esc(m.text) + '</div></div>';
   });
-  document.getElementById('concern-open').addEventListener('change', function (e) {
-    state.concernOpen = e.target.checked; renderApproval();
-  });
-  window.addEventListener('hashchange', show);
-  renderApproval(); show();
+  if (S.typing) h += '<div class="msg left"><div class="ai-who"><span class="ai-dot">' + SPARK + '</span>Orchestrator</div><div class="b-ai typing" aria-label="Orchestrator is typing"><i></i><i></i><i></i></div></div>';
+  h += '</div></div>';
+  h += '<div class="foot"><div class="row"><label for="msg-' + p + '" class="sr">Message as ' + p + '</label><input id="msg-' + p + '" class="input" type="text" placeholder="Message" data-enter="send" data-who="' + p + '"><button type="button" class="send" data-act="send" data-who="' + p + '" aria-label="Send">' + ARROW + '</button></div></div>';
+  return h;
+}
+function screen(p) {
+  if (p === 'Mei') return S.step === 'topic' ? hostTopic() : S.step === 'questions' ? hostQuestions() : chat('Mei');
+  return S.joined[p] ? chat(p) : guestInvite(p);
+}
+
+/* ---------- render, keeping typed text and focus ---------- */
+function render(focusWho) {
+  var keep = {}, active = document.activeElement && document.activeElement.id;
+  document.querySelectorAll('#stage input, #stage textarea').forEach(function (el) { keep[el.id] = el.value; });
+  document.getElementById('stage').innerHTML = ORDER.map(function (p, i) {
+    var P = PEOPLE[p];
+    return '<section class="col" aria-label="Phone ' + (i + 1) + ': ' + p + '"><div class="frame-label"><span class="dot" style="background:' + P.color + '"></span><b>' + (i + 1) + ' · ' + p + '</b>' + P.label + '</div>' +
+      '<div class="phone"><div class="screen"><div class="island" aria-hidden="true"></div>' + screen(p) + '</div></div></section>';
+  }).join('');
+  Object.keys(keep).forEach(function (id) { var el = document.getElementById(id); if (el && id !== 'topic' && !(focusWho && id === 'msg-' + focusWho)) el.value = keep[id]; });
+  var f = focusWho ? document.getElementById('msg-' + focusWho) : (active ? document.getElementById(active) : null);
+  if (f) { f.focus({ preventScroll: true }); if (f.setSelectionRange && f.value) f.setSelectionRange(f.value.length, f.value.length); }
+}
+
+/* ---------- events ---------- */
+var stage = document.getElementById('stage');
+stage.addEventListener('input', function (e) {
+  if (e.target.id === 'topic') {
+    S.topic = e.target.value;
+    var btn = stage.querySelector('[data-act="to-questions"]'); if (btn) btn.disabled = !S.topic.trim();
+  }
+});
+stage.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  var t = e.target;
+  if (t.getAttribute('data-enter') === 'send') { post(t.getAttribute('data-who'), t.value); }
+  if (t.getAttribute('data-enter') === 'answer' && t.value.trim()) { S.answers.push(t.value.trim()); render(); var n = document.getElementById('ans-Mei'); if (n) n.focus(); }
+});
+stage.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+  var act = b.getAttribute('data-act'), val = b.getAttribute('data-val'), who = b.getAttribute('data-who');
+  if (act === 'example') { S.topic = val; render(); }
+  else if (act === 'to-questions') { if (S.topic.trim()) { S.step = 'questions'; render(); } }
+  else if (act === 'back-topic') { S.step = 'topic'; render(); }
+  else if (act === 'answer') { S.answers.push(val); render(); }
+  else if (act === 'answer-typed') { var i = document.getElementById('ans-Mei'); if (i && i.value.trim()) { S.answers.push(i.value.trim()); render(); } }
+  else if (act === 'redo') { S.answers = []; render(); }
+  else if (act === 'create') { createRoom(); }
+  else if (act === 'join') { join(who); }
+  else if (act === 'send') { var m = document.getElementById('msg-' + who); if (m) post(who, m.value); }
+});
+document.getElementById('reset').addEventListener('click', function () { fresh(); render(); });
+render();
 })();
 </script>
 </body>
