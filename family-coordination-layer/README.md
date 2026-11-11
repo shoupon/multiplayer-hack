@@ -40,7 +40,7 @@ Two more demos build on the same server:
 
 | Command | What it shows |
 |---|---|
-| `make viz` | A page at http://127.0.0.1:8001. **Run live demo** runs the dinner scenario and replays it step by step: a sequence diagram of every REST call, MCP tool call, webhook push, and crash, next to the task's state machine and each request and response. |
+| `make viz` | A page at http://127.0.0.1:8001. Pick a scenario, either the two-agent dinner or the three-agent celebration, and click **Run live demo**. The page replays the run step by step: a sequence diagram of every REST call, MCP tool call, webhook push, and crash, next to the task's state machine and each request and response. In the celebration, calls to the mock calendars, TableBook, and email appear as arrows to an Outside world lane. Open http://127.0.0.1:8001/#celebration to start on it. |
 | `make demo-celebration` | Three people's agents plan a celebration dinner. They exchange calendars and dietary needs, and the concierge books a restaurant. Each agent asks its owner before it reads a calendar or pays a deposit. The calendars, booking service, and email are in-process mocks. Add `ARGS=--interactive` to make the owners' decisions yourself. |
 
 ## Run the server yourself

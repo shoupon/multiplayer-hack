@@ -1,4 +1,8 @@
-"""Who said, asked, decided, and did what, in order. Printed at the end and written as decision-log.html."""
+"""Who said, asked, decided, and did what, in order.
+
+Every entry also goes to the demo's Trace, which prints it in the terminal or records it for demo.viz.
+At the end the log is printed in full and written as decision-log.html.
+"""
 
 from __future__ import annotations
 
@@ -6,20 +10,13 @@ import html
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
+from demo.dinner import Trace
 from demo.outside import TPE
 
 Channel = Literal["fcl", "local", "owner", "outside"]
 CHANNEL_LABEL = {"fcl": "via FCL", "local": "agent's own reasoning", "owner": "owner decision", "outside": "outside service"}
-
-
-def say(who: str, text: str) -> None:
-    print(f"  {who:<18} {text}", flush=True)
-
-
-def heading(text: str) -> None:
-    print(f"\n== {text}", flush=True)
 
 
 @dataclass(frozen=True)
@@ -34,6 +31,8 @@ class Entry:
 
 @dataclass
 class DecisionLog:
+    trace: Trace
+    lanes: dict[str, str]  # actor display name -> trace lane id
     steps: dict[int, str] = field(default_factory=dict)
     entries: list[Entry] = field(default_factory=list)
     step: int = 0
@@ -41,15 +40,19 @@ class DecisionLog:
     def stage(self, n: int, title: str) -> None:
         self.step = n
         self.steps[n] = title
-        heading(f"{n}. {title}")
+        self.trace.section(f"{n}. {title}")
 
     def note(self, actor: str, channel: Channel, text: str, ref: str = "", quiet: bool = False) -> None:
         self.entries.append(Entry(datetime.now(TPE), self.step, actor, channel, text, ref))
         if not quiet:
-            say(actor, text)
+            self.trace.note(self.lanes[actor], text, {"channel": CHANNEL_LABEL[channel], "ref": ref} if ref else None)
+
+    def outside(self, actor: str, label: str, request: Any, response: Any) -> None:
+        """A call to a mock outside service, drawn as an arrow to the outside lane."""
+        self.trace.call(self.lanes[actor], "mock", label, request, 200, response, to="outside")
 
     def print(self) -> None:
-        heading("Decision log")
+        print("\n== Decision log", flush=True)
         for e in self.entries:
             print(f"  {e.at:%H:%M:%S}  {e.actor:<18} [{CHANNEL_LABEL[e.channel]}] {e.text}")
 

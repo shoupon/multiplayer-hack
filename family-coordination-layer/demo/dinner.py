@@ -49,10 +49,13 @@ class Trace:
     def section(self, title: str) -> None:
         print(f"\n== {title}", flush=True)
 
-    def note(self, lane: Lane, text: str, detail: Any = None) -> None:
-        print(f"  {LANE_NAMES[lane]:<18} {text}", flush=True)
+    def __init__(self, names: Optional[dict[str, str]] = None) -> None:
+        self.names = names or LANE_NAMES
 
-    def call(self, frm: Lane, via: str, label: str, request: Any, status: int, response: Any) -> None:
+    def note(self, lane: str, text: str, detail: Any = None) -> None:
+        print(f"  {self.names[lane]:<18} {text}", flush=True)
+
+    def call(self, frm: str, via: str, label: str, request: Any, status: int, response: Any, to: str = "fcl") -> None:
         pass
 
     def push(self, label: str, status: int, verified: bool, body: Any) -> None:
@@ -108,7 +111,7 @@ class FclProcess:
 class Rest:
     """A REST caller acting as one lane, with that lane's bearer token."""
 
-    def __init__(self, trace: Trace, lane: Lane, base_url: str, token: Optional[str] = None):
+    def __init__(self, trace: Trace, lane: str, base_url: str, token: Optional[str] = None):
         self.trace, self.lane, self.base_url, self.token = trace, lane, base_url, token
 
     def __call__(self, method: str, path: str, json_body: Any = None, idem: Optional[str] = None, **params: Any) -> Any:
@@ -162,7 +165,8 @@ class WebhookReceiver:
 
 
 @asynccontextmanager
-async def mcp_agent(trace: Trace, base_url: str, token: str, log: Path) -> AsyncIterator[Callable[..., Awaitable[dict[str, Any]]]]:
+async def mcp_agent(trace: Trace, base_url: str, token: str, log: Path,
+                    lane: str = "husband_agent") -> AsyncIterator[Callable[..., Awaitable[dict[str, Any]]]]:
     """Starts the FCL MCP server over stdio and returns a tool caller, as an MCP assistant host would."""
     params = StdioServerParameters(command=sys.executable, args=["-m", "fcl.mcp_server"], cwd=str(ROOT),
                                    env={**os.environ, "FCL_BASE_URL": base_url, "FCL_AGENT_TOKEN": token})
@@ -174,7 +178,7 @@ async def mcp_agent(trace: Trace, base_url: str, token: str, log: Path) -> Async
                 result = await session.call_tool(tool, args)
                 text = "".join(getattr(c, "text", "") for c in result.content)
                 body = text if result.is_error else (result.structured_content or json.loads(text))
-                trace.call("husband_agent", "MCP", tool, args, 500 if result.is_error else 200, body)
+                trace.call(lane, "MCP", tool, args, 500 if result.is_error else 200, body)
                 if result.is_error:
                     raise SystemExit(f"{tool} failed: {text}")
                 return body

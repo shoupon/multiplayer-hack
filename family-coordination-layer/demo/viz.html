@@ -9,9 +9,10 @@
 :root {
   --bg: #f6f6f3; --surface: #ffffff; --surface-2: #f0efeb; --border: #e2e0da; --line: #cfcdc6;
   --text: #1d1d1b; --muted: #6a6862; --faint: #9a988f;
-  --husband: #2f6fde; --husband-tint: #e8effc; --wife: #c2417a; --wife-tint: #fbe9f1;
+  --p1: #2f6fde; --p1-tint: #e8effc; --p2: #c2417a; --p2-tint: #fbe9f1; --p3: #b4531c; --p3-tint: #fbeee6;
+  --ext: #5b6b7f; --ext-tint: #eceff3;
   --fcl: #0d8473; --fcl-tint: #e2f4f1;
-  --rest: #56606c; --mcp: #7446d6; --webhook: #a86a12;
+  --rest: #56606c; --mcp: #7446d6; --webhook: #a86a12; --mock: #5b6b7f;
   --ok: #1d8049; --err: #c23a3a; --warn: #a86a12; --warn-tint: #fdf3e2;
   --gutter: 40px;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -20,18 +21,20 @@
   :root:not([data-theme="light"]) {
     --bg: #131312; --surface: #1b1b1a; --surface-2: #242422; --border: #33322f; --line: #44433f;
     --text: #ecebe6; --muted: #a09e96; --faint: #74726b;
-    --husband: #79a4f4; --husband-tint: #1c2638; --wife: #e781ae; --wife-tint: #36202b;
+    --p1: #79a4f4; --p1-tint: #1c2638; --p2: #e781ae; --p2-tint: #36202b; --p3: #f09a62; --p3-tint: #352419;
+    --ext: #9fb0c4; --ext-tint: #222830;
     --fcl: #46c2ad; --fcl-tint: #17302c;
-    --rest: #a3abb5; --mcp: #a98bf2; --webhook: #e2aa4c;
+    --rest: #a3abb5; --mcp: #a98bf2; --webhook: #e2aa4c; --mock: #9fb0c4;
     --ok: #57c585; --err: #ef7070; --warn: #e2aa4c; --warn-tint: #33291a;
   }
 }
 :root[data-theme="dark"] {
   --bg: #131312; --surface: #1b1b1a; --surface-2: #242422; --border: #33322f; --line: #44433f;
   --text: #ecebe6; --muted: #a09e96; --faint: #74726b;
-  --husband: #79a4f4; --husband-tint: #1c2638; --wife: #e781ae; --wife-tint: #36202b;
+  --p1: #79a4f4; --p1-tint: #1c2638; --p2: #e781ae; --p2-tint: #36202b; --p3: #f09a62; --p3-tint: #352419;
+  --ext: #9fb0c4; --ext-tint: #222830;
   --fcl: #46c2ad; --fcl-tint: #17302c;
-  --rest: #a3abb5; --mcp: #a98bf2; --webhook: #e2aa4c;
+  --rest: #a3abb5; --mcp: #a98bf2; --webhook: #e2aa4c; --mock: #9fb0c4;
   --ok: #57c585; --err: #ef7070; --warn: #e2aa4c; --warn-tint: #33291a;
 }
 * { box-sizing: border-box; }
@@ -49,6 +52,7 @@ header {
 header h1 { font-size: 17px; margin: 0; letter-spacing: -0.01em; }
 header p { margin: 2px 0 0; color: var(--muted); font-size: 13px; max-width: 70ch; }
 .run-box { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+.run-box select { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 5px 8px; }
 .btn {
   border: 1px solid var(--border); background: var(--surface); border-radius: 8px;
   padding: 6px 12px; cursor: pointer; white-space: nowrap;
@@ -78,13 +82,13 @@ header p { margin: 2px 0 0; color: var(--muted); font-size: 13px; max-width: 70c
 .banner code { font-family: var(--mono); font-size: 12px; }
 main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
 .diagram { overflow: auto; position: relative; }
-.diagram-inner { min-width: 700px; padding-bottom: 40px; }
+.diagram-inner { min-width: calc(var(--gutter) + var(--lanes, 5) * 116px); padding-bottom: 40px; }
 aside { border-left: 1px solid var(--border); overflow: auto; background: var(--surface); }
 
 /* lanes */
 .lanes {
   position: sticky; top: 0; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--border);
-  display: grid; grid-template-columns: var(--gutter) repeat(5, minmax(0, 1fr)); padding: 10px 0;
+  display: grid; grid-template-columns: var(--gutter) repeat(var(--lanes, 5), minmax(0, 1fr)); padding: 10px 0;
 }
 .lane { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 3px; padding: 0 6px; }
 .avatar {
@@ -96,20 +100,22 @@ aside { border-left: 1px solid var(--border); overflow: auto; background: var(--
 .lane .name { font-weight: 600; font-size: 13px; }
 .lane .sub { color: var(--muted); font-size: 11.5px; }
 .lane .offline { font-size: 11px; color: #fff; background: var(--err); border-radius: 999px; padding: 0 8px; }
-.tone-husband { --tone: var(--husband); --tone-tint: var(--husband-tint); }
-.tone-wife { --tone: var(--wife); --tone-tint: var(--wife-tint); }
+.tone-p1 { --tone: var(--p1); --tone-tint: var(--p1-tint); }
+.tone-p2 { --tone: var(--p2); --tone-tint: var(--p2-tint); }
+.tone-p3 { --tone: var(--p3); --tone-tint: var(--p3-tint); }
+.tone-ext { --tone: var(--ext); --tone-tint: var(--ext-tint); }
 .tone-fcl { --tone: var(--fcl); --tone-tint: var(--fcl-tint); }
 
 /* timeline */
 .timeline { position: relative; padding-top: 8px; }
 .lifelines {
   position: absolute; top: 0; bottom: 0; left: var(--gutter); right: 0;
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); pointer-events: none;
+  display: grid; grid-template-columns: repeat(var(--lanes, 5), minmax(0, 1fr)); pointer-events: none;
 }
 .lifelines span { background: repeating-linear-gradient(to bottom, var(--line) 0 5px, transparent 5px 10px) center / 1.5px 100% no-repeat; }
 .lifelines span.down { background: repeating-linear-gradient(to bottom, var(--err) 0 3px, transparent 3px 9px) center / 2px 100% no-repeat; }
 .row {
-  position: relative; display: grid; grid-template-columns: var(--gutter) repeat(5, minmax(0, 1fr));
+  position: relative; display: grid; grid-template-columns: var(--gutter) repeat(var(--lanes, 5), minmax(0, 1fr));
   align-items: center; padding: 6px 0; cursor: pointer; border-radius: 8px; scroll-margin: 100px 0 40px;
 }
 .row:hover { background: color-mix(in srgb, var(--text) 3.5%, transparent); }
@@ -148,6 +154,7 @@ aside { border-left: 1px solid var(--border); overflow: auto; background: var(--
 .via-REST { --via: var(--rest); }
 .via-MCP { --via: var(--mcp); }
 .via-webhook { --via: var(--webhook); }
+.via-mock { --via: var(--mock); }
 .arrow .line { position: relative; height: 2px; background: currentColor; margin: 0 calc(100% / var(--span) / 2); transform-origin: left; }
 .arrow.rtl .line { transform-origin: right; }
 .arrow.push .line { background: repeating-linear-gradient(90deg, currentColor 0 6px, transparent 6px 10px); }
@@ -215,7 +222,7 @@ pre {
   margin: 0; padding: 10px; border-radius: 8px; background: var(--surface-2); font: 11.5px/1.5 var(--mono);
   max-height: 300px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
 }
-pre .k { color: var(--husband); }
+pre .k { color: var(--p1); }
 pre .s { color: var(--ok); }
 pre .n { color: var(--webhook); }
 pre .l { color: var(--mcp); }
@@ -236,10 +243,12 @@ pre .l { color: var(--mcp); }
 <body>
 <header>
   <div>
-    <h1>Family Coordination Layer · dinner coordination</h1>
-    <p>Two personal agents from different providers agree on dinner. Both agents are scripted. Every arrow is a real call to a live FCL server started on this laptop for the run.</p>
+    <h1>Family Coordination Layer · <span id="title">loading…</span></h1>
+    <p id="blurb"></p>
   </div>
   <div class="run-box">
+    <label for="scenario" class="muted">Scenario</label>
+    <select id="scenario"></select>
     <span id="status" class="pill">no run yet</span>
     <button id="run" class="btn primary">Run live demo</button>
   </div>
@@ -260,11 +269,7 @@ pre .l { color: var(--mcp); }
   </label>
   <span class="progress" id="progress">step 0 / 0</span>
   <div class="bar"><div id="bar"></div></div>
-  <div class="legend">
-    <span><span class="via-badge via-REST">REST</span>bearer token</span>
-    <span><span class="via-badge via-MCP">MCP</span>stdio tool call</span>
-    <span><span class="via-badge via-webhook">webhook</span>signed push</span>
-  </div>
+  <div class="legend" id="legend"></div>
 </div>
 <div id="banner"></div>
 <main>
@@ -282,14 +287,8 @@ pre .l { color: var(--mcp); }
 </main>
 <script>
 "use strict";
-const LANES = [
-  { id: "husband", name: "Husband", sub: "person · user token", tone: "husband", kind: "person", mark: "H" },
-  { id: "husband_agent", name: "Husband's assistant", sub: "agent · MCP over stdio", tone: "husband", kind: "agent", mark: "AI" },
-  { id: "fcl", name: "FCL", sub: "coordination server · SQLite", tone: "fcl", kind: "server", mark: "FCL" },
-  { id: "companion", name: "Wife's companion", sub: "agent · REST + webhook", tone: "wife", kind: "agent", mark: "AI" },
-  { id: "wife", name: "Wife", sub: "person · approver", tone: "wife", kind: "person", mark: "W" },
-];
-const IDX = Object.fromEntries(LANES.map((l, i) => [l.id, i]));
+const VIAS = { REST: "bearer token", MCP: "stdio tool call", webhook: "signed push", mock: "outside service (mock)" };
+let SCENARIOS = [], SCEN = null, LANES = [], IDX = {};
 const FLOW = [
   ["CREATED", "Task written. The proposal is version 1."],
   ["AWAITING_DELIVERY", "Proposal queued for the invitee's agent."],
@@ -297,7 +296,7 @@ const FLOW = [
   ["AWAITING_APPROVAL", "An agent's answer is parked until its human decides."],
   ["COUNTERPROPOSED", "A newer version is on the table."],
   ["AGREED", "Every participant accepted the same version."],
-  ["COMPLETED", "A person marked it done. Delivery alone never does."],
+  ["COMPLETED", "Marked done with evidence. Delivery or agreement alone never does."],
 ];
 const OTHER = ["DECLINED", "EXPIRED", "CANCELLED", "FAILED"];
 
@@ -306,6 +305,19 @@ const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let events = [], shown = 0, selected = null, enterSeq = null;
 let playing = false, timer = null, pollTimer = null;
 let run = { id: null, status: "none", error: null, data_dir: null };
+
+function setScenario(id) {
+  SCEN = SCENARIOS.find((s) => s.id === id) || SCENARIOS[0];
+  LANES = SCEN.lanes;
+  IDX = Object.fromEntries(LANES.map((l, i) => [l.id, i]));
+  document.documentElement.style.setProperty("--lanes", LANES.length);
+  $("scenario").value = SCEN.id;
+  $("title").textContent = SCEN.title;
+  $("blurb").textContent = SCEN.blurb;
+  $("legend").innerHTML = SCEN.vias.map((v) => `<span><span class="via-badge via-${v}">${v}</span>${VIAS[v]}</span>`).join("");
+  document.title = `FCL · ${SCEN.title}`;
+  if (location.hash !== `#${SCEN.id}`) history.replaceState(null, "", `#${SCEN.id}`);
+}
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const escText = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -332,7 +344,12 @@ function summary(e) {
   if (e.kind === "push") return e.verified ? "signature verified" : "bad signature";
   const r = e.response;
   if (typeof r === "string") return r;
+  if (Array.isArray(r)) return `${r.length} result${r.length === 1 ? "" : "s"}`;
   if (!r || typeof r !== "object") return "";
+  if (r.reference) return `booking ${r.reference}`;
+  if (r.hold_id) return `${shortId(r.hold_id)} · deposit ${r.deposit}`;
+  if (r.token) return `token ${r.token}`;
+  if (r.kitchen_allergens) return `allergens: ${r.kitchen_allergens.join(", ") || "none"}`;
   if (r.result && r.task) return `${r.result} · ${r.task.state}`;
   if (r.state) return `task ${r.state}`;
   if (r.task && r.task.state) return `task ${r.task.state}`;
@@ -384,8 +401,8 @@ function rowHtml(e, i) {
     body = `<div class="section-title">${esc(e.title)}</div>`;
   } else if (e.kind === "note" || e.kind === "server") {
     const li = IDX[e.lane], lane = LANES[li];
-    const start = Math.min(Math.max(li - 1, 0), 2) + 2;
-    const justify = li === 0 ? "start" : li === 4 ? "end" : "center";
+    const start = Math.min(Math.max(li - 1, 0), LANES.length - 3) + 2;
+    const justify = li === 0 ? "start" : li === LANES.length - 1 ? "end" : "center";
     const extra = e.kind === "server" ? (e.up ? "up" : "down") : "";
     const who = e.kind === "server" ? (e.up ? "FCL · up" : "FCL · crashed") : lane.name;
     body = `<div style="grid-column:${start} / span 3; justify-self:${justify}; max-width:100%; padding: 0 6px">
@@ -408,8 +425,8 @@ function renderTimeline() {
   const tl = $("timeline");
   if (!events.length) {
     tl.innerHTML = run.status === "running"
-      ? `<div class="empty">Starting a fresh FCL server and two scripted agents…</div>`
-      : `<div class="empty"><strong>Press “Run live demo”.</strong><br>The page starts a fresh FCL server process on this laptop. The husband's agent connects over MCP and the wife's companion over REST. The page records every call and replays the run here, one step at a time.</div>`;
+      ? `<div class="empty">Starting a fresh FCL server and the scripted agents…</div>`
+      : `<div class="empty"><strong>Press “Run live demo”.</strong><br>The page starts a fresh FCL server process on this laptop, runs “${esc(SCEN.title)}”, records every call, and replays the run here one step at a time.</div>`;
     return;
   }
   const down = fclDownAt(shown);
@@ -427,7 +444,7 @@ function fmtTime(iso) {
 function renderState(e) {
   const t = e && e.task;
   if (!t) {
-    $("state").innerHTML = `<h2>Coordination task</h2><p class="muted">No task yet. It appears when the husband's agent proposes dinner.</p>`;
+    $("state").innerHTML = `<h2>Coordination task</h2><p class="muted">${esc(SCEN.task_hint)}</p>`;
     return;
   }
   const nm = names();
@@ -455,9 +472,10 @@ function renderState(e) {
     <ul class="flow">${flow}</ul>
     <div class="others">${others}</div>
     <dl class="kv">
-      <dt>On the table</dt><dd><span class="proposal">v${t.proposal_version} · ${esc(fmtTime(p.proposed_time))}</span><br><span class="muted">${p.duration_minutes || "?"} min, proposed by ${esc(who(t.proposal_author_user_id))}</span></dd>
+      <dt>On the table</dt><dd><span class="proposal">v${t.proposal_version} · ${esc(fmtTime(p.proposed_time))}</span><br><span class="muted">${p.duration_minutes || "?"} min, proposed by ${esc(who(t.proposal_author_user_id))}</span>${p.location ? `<br>${esc(p.location)}` : ""}</dd>
       <dt>Rounds</dt><dd>${t.negotiation_count} of ${t.max_negotiations} counterproposals used</dd>
       ${t.outcome ? `<dt>Outcome</dt><dd><strong>${esc(fmtTime(t.outcome.proposal.proposed_time))}</strong>, version ${t.outcome.proposal_version}</dd>` : ""}
+      ${t.outcome && t.outcome.completion ? `<dt>Evidence</dt><dd>${Object.entries(t.outcome.completion.evidence).map(([k, v]) => `${esc(k)}: <code>${esc(shortId(v))}</code>`).join("<br>")}</dd>` : ""}
     </dl>
     <h3>Participants</h3><ul class="people">${people}</ul>
     <h3>Transitions</h3><ul class="history">${hist}</ul>`;
@@ -496,7 +514,7 @@ function renderChrome() {
   $("first").disabled = $("prev").disabled = shown === 0;
   $("next").disabled = $("last").disabled = shown >= total;
   $("play").disabled = !total && run.status !== "running";
-  $("run").disabled = run.status === "running";
+  $("run").disabled = $("scenario").disabled = run.status === "running";
   const pill = $("status");
   pill.className = "pill " + (run.status === "none" ? "" : run.status);
   pill.textContent = { none: "no run yet", running: "running…", passed: "run passed", failed: "run failed" }[run.status];
@@ -506,7 +524,7 @@ function renderChrome() {
     banner.innerHTML = `The run failed: <code>${esc(run.error || "unknown error")}</code>`;
   } else if (run.status === "passed" && shown === total) {
     banner.className = "banner passed";
-    banner.innerHTML = `Run passed. Both people see AGREED at 19:30. Database and server log: <code>${esc(run.data_dir || "")}</code>`;
+    banner.innerHTML = `${esc(SCEN.passed)} Database and server log: <code>${esc(run.data_dir || "")}</code>`;
   } else {
     banner.className = "";
     banner.innerHTML = "";
@@ -585,15 +603,20 @@ async function startRun() {
   events = []; shown = 0; selected = null; enterSeq = null;
   run = { id: null, status: "running", error: null, data_dir: null };
   render();
-  const r = await fetch("/api/runs", { method: "POST" });
+  const r = await fetch(`/api/runs?scenario=${SCEN.id}`, { method: "POST" });
   const j = await r.json();
+  if (r.status === 409) setScenario(j.detail.scenario);
   run.id = r.status === 409 ? j.detail.id : j.id;
   setPlaying(true);
   poll();
 }
 
 async function loadLatest() {
-  const j = await (await fetch("/api/runs/latest")).json();
+  clearTimeout(pollTimer);
+  setPlaying(false);
+  events = []; shown = 0; selected = null; enterSeq = null;
+  run = { id: null, status: "none", error: null, data_dir: null };
+  const j = await (await fetch(`/api/runs/latest?scenario=${SCEN.id}`)).json();
   if (!j) return render();
   events = j.events;
   run = { id: j.id, status: j.status, error: j.error, data_dir: j.data_dir };
@@ -602,6 +625,20 @@ async function loadLatest() {
   if (run.status === "running") { setPlaying(true); poll(); }
 }
 
+async function init() {
+  SCENARIOS = await (await fetch("/api/scenarios")).json();
+  $("scenario").innerHTML = SCENARIOS.map((s) => `<option value="${s.id}">${esc(s.title)}</option>`).join("");
+  const latest = await (await fetch("/api/runs/latest")).json();
+  const wanted = location.hash.slice(1);
+  setScenario(SCENARIOS.some((s) => s.id === wanted) ? wanted : latest ? latest.scenario : SCENARIOS[0].id);
+  await loadLatest();
+}
+
+$("scenario").onchange = () => { setScenario($("scenario").value); loadLatest(); };
+window.addEventListener("hashchange", () => {
+  const id = location.hash.slice(1);
+  if (SCEN && id !== SCEN.id && run.status !== "running" && SCENARIOS.some((s) => s.id === id)) { setScenario(id); loadLatest(); }
+});
 $("run").onclick = startRun;
 $("play").onclick = () => setPlaying(!playing);
 $("next").onclick = () => { setPlaying(false); step(1); };
@@ -627,7 +664,7 @@ document.addEventListener("keydown", (ev) => {
   else if (ev.key === "Home") { ev.preventDefault(); setPlaying(false); jump(0); }
   else if (ev.key === "End") { ev.preventDefault(); setPlaying(false); jump(events.length); }
 });
-loadLatest();
+init();
 </script>
 </body>
 </html>

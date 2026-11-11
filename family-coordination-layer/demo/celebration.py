@@ -13,6 +13,7 @@ approve by joining and connecting their own agents. Each agent knows something t
 
 Run: make demo-celebration            (owners' decisions are auto-approved)
      make demo-celebration ARGS=--interactive   (you approve and type the card)
+     make viz                         (pick "Hackathon celebration" to replay it step by step)
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any, Callable, Optional, Protocol
 
-from demo.decision_log import DecisionLog, say
+from demo.decision_log import DecisionLog
 from demo.dinner import ROOT, FclProcess, Rest, Trace, free_port, mcp_agent
 from demo.outside import (EVENING_END, EVENING_START, TPE, Calendar, Card, Event, Hold, Outbox, TableBook, at,
                           day_label)
@@ -35,11 +36,32 @@ from demo.outside import (EVENING_END, EVENING_START, TPE, Calendar, Card, Event
 DEFAULT_GOAL = "find a restaurant and dinner so we can celebrate winning compile hackathon for next week"
 ACTIONS = ["agent:message:send", "agent:message:receive", "family:members:discover", "task:propose", "task:respond"]
 TEST_CARD = "4242 4242 4242 4242"
-SILENT = Trace()  # the two-agent visualizer's tracer; this demo narrates through DecisionLog instead
+LANES = {"chloe": "Chloe", "concierge": "Chloe's concierge", "fcl": "FCL", "alice_agent": "Alice's assistant",
+         "alice": "Alice", "ben_agent": "Ben's assistant", "ben": "Ben", "outside": "Outside world"}
 
 
-def rest_as(base_url: str, token: Optional[str] = None) -> Rest:
-    return Rest(SILENT, "fcl", base_url, token)
+class HideEmptyPolls(Trace):
+    """Agents poll their inbox and owners their approvals every round. Empty polls would bury the story."""
+
+    def __init__(self, inner: Trace):
+        super().__init__(LANES)
+        self.inner = inner
+
+    def section(self, title: str) -> None:
+        self.inner.section(title)
+
+    def note(self, lane: str, text: str, detail: Any = None) -> None:
+        self.inner.note(lane, text, detail)
+
+    def call(self, frm: str, via: str, label: str, request: Any, status: int, response: Any, to: str = "fcl") -> None:
+        if not (isinstance(response, dict) and response.get("items") == []):
+            self.inner.call(frm, via, label, request, status, response, to)
+
+    def server(self, up: bool, text: str) -> None:
+        self.inner.server(up, text)
+
+    def watch(self, base_url: str, token: str, task_id: str) -> None:
+        self.inner.watch(base_url, token, task_id)
 
 
 def days(ds: Any) -> str:
@@ -206,6 +228,9 @@ class Agent:
     def note(self, text: str, channel: Any = "local", ref: str = "") -> None:
         self.log.note(self.name, channel, text, ref)
 
+    def outside(self, label: str, request: Any, response: Any) -> None:
+        self.log.outside(self.name, label, request, response)
+
     async def step(self) -> bool:
         items, self.cursor = await self.fcl.inbox(self.cursor)
         for item in items:
@@ -239,7 +264,10 @@ class CalendarAssistant(Agent):
         self.calendar, self.budget = calendar, budget
 
     def free(self) -> list[date]:
-        return self.calendar.free_evenings(self.brief.first, self.brief.last)
+        free = self.calendar.free_evenings(self.brief.first, self.brief.last)
+        self.outside("Alice's calendar: free evenings", {"from": self.brief.first.isoformat(), "to": self.brief.last.isoformat()},
+                     [d.isoformat() for d in free])
+        return free
 
     async def handle(self, m: dict[str, Any]) -> None:
         t, p = m["type"], m["payload"]
@@ -308,6 +336,8 @@ class Companion(Agent):
                    and datetime.fromisoformat(window["window_end"]) > datetime.combine(self.brief.last, time.min, TPE))
         assert allowed, "never read the calendar outside what Ben granted"
         free = self.calendar.free_evenings(self.brief.first, self.brief.last)
+        self.outside("Ben's calendar: free evenings", {"from": self.brief.first.isoformat(), "to": self.brief.last.isoformat(),
+                                                       "approval_id": approval_id}, [d.isoformat() for d in free])
         self.note(f"Ben allowed it; read Ben's calendar for that week only: free {days(free)}", "outside", approval_id)
         self.all_free = set(free).intersection(*(set(d) for d in others.values()))
         self.note(f"lined up all three calendars: {days(self.all_free)} works for everyone")
@@ -324,6 +354,9 @@ class Companion(Agent):
             problems.append("no TableBook listing to check allergens against")
         else:
             r = self.tablebook.restaurant(found.group(1))
+            self.outside(f"TableBook: listing {r.id}", None, {"name": r.name, "vegetarian_mains": r.vegetarian_mains,
+                                                               "kitchen_allergens": sorted(r.kitchen_allergens),
+                                                               "price_pp": r.price_pp})
             self.note(f"checked {r.name} with TableBook directly instead of trusting the proposal text: kitchen "
                       f"allergens {', '.join(sorted(r.kitchen_allergens)) or 'none'}, vegetarian mains "
                       f"{'yes' if r.vegetarian_mains else 'no'}", "outside")
@@ -340,11 +373,11 @@ class Concierge(Agent):
     """Chloe's concierge: runs the plan, manages Chloe's own calendar, books and pays only with Chloe's approval."""
 
     def __init__(self, *args: Any, calendar: Calendar, tablebook: TableBook, guests: dict[str, str],
-                 contacts: list[tuple[str, str]]):
+                 contacts: list[tuple[str, str]], watch: Callable[[str], None]):
         super().__init__(*args)
-        self.tablebook, self.guests, self.contacts = tablebook, guests, contacts
+        self.calendar, self.tablebook, self.guests, self.contacts, self.watch = calendar, tablebook, guests, contacts, watch
         self.prefs: dict[str, dict[str, Any]] = {"Chloe": {"budget_per_person": 2000, "dietary": [], "allergies": []}}
-        self.evenings = {"Chloe": calendar.free_evenings(self.brief.first, self.brief.last)}
+        self.evenings: dict[str, list[date]] = {}
         self.alignment_sent = False
         self.hold: Optional[Hold] = None
         self.why = ""
@@ -357,6 +390,9 @@ class Concierge(Agent):
         return next(agent_id for agent_id, name in self.guests.items() if name == person)
 
     async def kickoff(self) -> None:
+        self.evenings["Chloe"] = self.calendar.free_evenings(self.brief.first, self.brief.last)
+        self.outside("Chloe's calendar: free evenings", {"from": self.brief.first.isoformat(), "to": self.brief.last.isoformat()},
+                     [d.isoformat() for d in self.evenings["Chloe"]])
         self.note(f"Chloe's calendar (already connected): free {days(self.evenings['Chloe'])}", "outside")
         for agent_id, person in self.guests.items():
             await self.fcl.send(self.family_id, agent_id, "information.request", {
@@ -427,7 +463,10 @@ class Concierge(Agent):
                   + (f", no {' or '.join(sorted(avoid))} in the kitchen" if avoid else ""))
         candidates = []
         for day in common:
-            for r, seatings in self.tablebook.search(day):
+            found = self.tablebook.search(day)
+            self.outside(f"TableBook: search {day_label(day)}", {"date": day.isoformat(), "party": party},
+                         [{"restaurant": r.name, "free_seatings": [s.strftime("%H:%M") for s in seatings]} for r, seatings in found])
+            for r, seatings in found:
                 problems = []
                 if r.price_pp > cap:
                     problems.append(f"NT${r.price_pp:,} per person is over budget")
@@ -447,6 +486,8 @@ class Concierge(Agent):
             return
         (r, start), *others = candidates
         self.hold = h = self.tablebook.hold(r.id, start, party)
+        self.outside(f"TableBook: hold {r.name}", {"restaurant": r.id, "start": start.isoformat(), "party": party},
+                     {"hold_id": h.id, "deposit": nt(h.deposit_minor), "expires_at": h.expires_at.isoformat()})
         when = f"{day_label(start.date())} {start:%H:%M}"
         self.why = (f"the only evening all three are free, vegetarian mains and no peanuts in the kitchen, "
                     f"NT${r.price_pp:,} per person is under everyone's budget"
@@ -458,6 +499,7 @@ class Concierge(Agent):
             "location": f"{r.name}, {r.address} (tablebook:{r.id})",
             "note": f"Why: {self.why}. Deposit {nt(h.deposit_minor)}, table held until {h.expires_at:%H:%M}.",
         }, expires_at=h.expires_at.isoformat(), idem="dinner-proposal")
+        self.watch(self.task["id"])
         self.note(f"proposed {r.name}, {when} to {whose(self.guests.values())} agents", "fcl", self.task["id"])
 
     async def ask_to_book(self) -> None:
@@ -482,9 +524,14 @@ class Concierge(Agent):
         assert self.card is not None, "Chloe hands the card token to her own concierge, never through FCL"
         self.log.stage(5, "Booked: everyone gets the email, and the decision log is written")
         booking = self.tablebook.confirm(h.id, self.card.token, h.deposit_minor, a["id"], self.contacts)
+        pay = {"hold_id": h.id, "card_token": self.card.token, "amount": nt(h.deposit_minor), "idempotency_key": a["id"]}
+        self.outside("TableBook: confirm and pay", pay, {"reference": booking.reference, "receipt": booking.receipt_id})
+        self.log.note("Outside world", "outside", f"TableBook emailed {', '.join(n for n, _ in self.contacts)}: "
+                                                  f"\"{self.tablebook.outbox.sent[-1].name}\" and two more, each with an .ics invite")
         self.note(f"paid the {nt(booking.charged_minor)} deposit (card ending {booking.card_last4}); "
                   f"booking {booking.reference}", "outside", booking.receipt_id)
         again = self.tablebook.confirm(h.id, self.card.token, h.deposit_minor, a["id"], self.contacts)
+        self.outside("TableBook: confirm and pay (retry)", pay, {"reference": again.reference, "receipt": again.receipt_id})
         assert again == booking
         self.note("retried the payment with the same approval id: same booking, no second charge", "outside")
         evidence = {"booking_reference": booking.reference, "receipt_id": booking.receipt_id,
@@ -529,10 +576,7 @@ class Phone:
             ask, summary = f"Pay {nt(params['amount_minor'])} to {params['payee']}?", f"{nt(params['amount_minor'])} deposit"
         else:
             ask, summary = f"Approve {asker}'s {act.get('kind')}?", str(act.get("kind"))
-        print(f"\n  ┌─ {self.person}'s phone · FCL")
-        print(f"  │ {asker} asks: {ask}")
-        print(f"  │ {act.get('purpose') or ''}")
-        print("  └─")
+        self.log.note(self.person, "fcl", f"phone: {asker} asks \"{ask}\" Why: {act.get('purpose') or 'not given'}", a["id"])
         allowed = self.ask("Allow?", "y").lower().startswith("y")
         if allowed and self.pay is not None and act.get("scope") == "payment.charge":
             tablebook, hand_over = self.pay
@@ -546,6 +590,8 @@ class Phone:
                         raise
                     print(f"  {'':<18} {e}; try again")
             self.cards_typed.append(number.replace(" ", ""))
+            self.log.outside(self.person, "TableBook: card field", {"number": f"•••• {card.last4}"},
+                             {"token": card.token, "last4": card.last4})
             hand_over(card)
             self.log.note(self.person, "owner", f"entered a card on TableBook's payment page (ending {card.last4}); only "
                                                 "a TableBook token goes to Chloe's concierge, and FCL sees neither")
@@ -577,24 +623,34 @@ def calendars(week: date) -> dict[str, Calendar]:
     }
 
 
-async def run(goal: str, interactive: bool) -> None:
-    data = ROOT / ".data" / f"celebration-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+async def run(trace: Trace, goal: str = DEFAULT_GOAL, interactive: bool = False) -> Path:
+    data = ROOT / ".data" / f"celebration-{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}"
     data.mkdir(parents=True)
     fcl = FclProcess(data / "fcl.db", free_port(), data / "server.log")
-    fcl.start()
-    anon = rest_as(fcl.base_url)
-    log = DecisionLog()
+    try:
+        fcl.start()
+        trace.server(True, f"started on {fcl.base_url}, pid {fcl.pid}, fresh SQLite file")
+        await _story(HideEmptyPolls(trace), fcl, data, goal, interactive)
+    finally:
+        fcl.kill()
+    return data
 
+
+async def _story(trace: Trace, fcl: FclProcess, data: Path, goal: str, interactive: bool) -> None:
+    def rest_as(lane: str, token: Optional[str] = None) -> Rest:
+        return Rest(trace, lane, fcl.base_url, token)
+
+    log = DecisionLog(trace, {name: lane for lane, name in LANES.items()})
     log.stage(1, "Chloe types a goal")
-    say("Chloe", f'"{goal}"')
+    log.note("Chloe", "owner", f'"{goal}"')
     brief = draft_brief(goal, datetime.now(TPE).date())
     log.note("Chloe's concierge", "local", f"brief: dinner to celebrate {brief.occasion}, "
                                            f"{day_label(brief.first)} to {day_label(brief.last)}; needs everyone's "
                                            f"free evenings, budget and food needs")
 
     log.stage(2, "The room starts: Chloe invites Alice and Ben, and they approve")
-    people = {name: anon("POST", "/v1/users", {"display_name": name}) for name in ("Chloe", "Alice", "Ben")}
-    rest = {name: rest_as(fcl.base_url, u["token"]) for name, u in people.items()}
+    people = {name: rest_as(name.lower())("POST", "/v1/users", {"display_name": name}) for name in ("Chloe", "Alice", "Ben")}
+    rest = {name: rest_as(name.lower(), u["token"]) for name, u in people.items()}
     room = rest["Chloe"]("POST", "/v1/families", {"name": f"Celebrate {brief.occasion}"})
     log.note("Chloe", "owner", f"opened the room \"{room['name']}\"", room["id"])
     registered = {}
@@ -620,13 +676,14 @@ async def run(goal: str, interactive: bool) -> None:
     tablebook = TableBook(outbox)
     cal = calendars(brief.first)
 
-    async with mcp_agent(SILENT, fcl.base_url, registered["Chloe"]["token"], data / "mcp-chloe.log") as chloe_mcp, \
-            mcp_agent(SILENT, fcl.base_url, registered["Alice"]["token"], data / "mcp-alice.log") as alice_mcp:
+    async with mcp_agent(trace, fcl.base_url, registered["Chloe"]["token"], data / "mcp-chloe.log", "concierge") as chloe_mcp, \
+            mcp_agent(trace, fcl.base_url, registered["Alice"]["token"], data / "mcp-alice.log", "alice_agent") as alice_mcp:
         common = (room["id"], brief, log, names)
         concierge = Concierge("Chloe's concierge", McpFcl(chloe_mcp), *common, calendar=cal["Chloe"],
-                              tablebook=tablebook, guests=guests, contacts=contacts)
+                              tablebook=tablebook, guests=guests, contacts=contacts,
+                              watch=lambda task_id: trace.watch(fcl.base_url, people["Chloe"]["token"], task_id))
         alice = CalendarAssistant("Alice's assistant", McpFcl(alice_mcp), *common, calendar=cal["Alice"], budget=1500)
-        ben = Companion("Ben's assistant", RestFcl(rest_as(fcl.base_url, registered["Ben"]["token"]), registered["Ben"]["id"]),
+        ben = Companion("Ben's assistant", RestFcl(rest_as("ben_agent", registered["Ben"]["token"]), registered["Ben"]["id"]),
                         *common, calendar=cal["Ben"], tablebook=tablebook)
         phones = [Phone("Ben", rest["Ben"], log, names, interactive),
                   Phone("Chloe", rest["Chloe"], log, names, interactive,
@@ -660,7 +717,7 @@ async def run(goal: str, interactive: bool) -> None:
         ("Booking", f"{b.reference}, deposit {nt(b.charged_minor)} (card ending {b.card_last4})"),
         ("FCL task", f"{task_id}, {views['Chloe']['state']}"),
     ])
-    print(f"\nDemo passed. Decision log: {page}\nEmails: {outbox.folder}\nDatabase and server log: {data}")
+    print(f"\nDemo passed. Decision log: {page}\nEmails: {outbox.folder}\nDatabase and server log: {data}", flush=True)
 
 
 def main() -> None:
@@ -668,7 +725,7 @@ def main() -> None:
     parser.add_argument("--goal", default=DEFAULT_GOAL)
     parser.add_argument("--interactive", action="store_true", help="approve requests and type the card yourself")
     args = parser.parse_args()
-    asyncio.run(run(args.goal, args.interactive))
+    asyncio.run(run(Trace(LANES), args.goal, args.interactive))
 
 
 if __name__ == "__main__":
