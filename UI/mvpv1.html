@@ -104,6 +104,39 @@ input.input{flex:1;min-width:0;height:48px;padding:0 18px;border:1px solid var(-
 .spinner{width:16px;height:16px;border-radius:999px;border:2px solid #DDDDDD;border-top-color:var(--ink);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+
+/* agent proposal + agent log panel */
+.proposal{border:1.5px solid var(--ink);border-radius:18px;padding:14px;background:var(--white);display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow)}
+.proposal .steps{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
+.proposal .steps div{display:flex;gap:8px;align-items:flex-start}
+.proposal .steps svg{flex:none;margin-top:2px}
+.quote{background:var(--soft);border-radius:12px;padding:12px;font-size:14.5px;line-height:1.45}
+.btns{display:flex;gap:8px}
+.btn-sm{flex:1;min-height:44px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
+.btn-sm.solid{border:0;background:var(--brand);color:#FFFFFF}
+.btn-sm.solid:hover{background:var(--brand-ink)}
+.btn-sm.line{border:1px solid var(--line);background:#FFFFFF;color:var(--ink)}
+.btn-sm.line:hover{border-color:var(--ink)}
+textarea.edit{width:100%;min-height:90px;padding:12px;border:1px solid var(--ink);border-radius:12px;font-size:15px;line-height:1.45;resize:none;outline:none}
+.done-note{font-size:12px;font-weight:600;color:var(--muted)}
+.menu-btn{margin-left:auto}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,0.32);opacity:0;pointer-events:none;transition:opacity .28s ease;z-index:6}
+.scrim.open{opacity:1;pointer-events:auto}
+.panel{position:absolute;top:0;right:0;bottom:0;width:88%;background:#FFFFFF;z-index:7;transform:translateX(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1);box-shadow:-16px 0 40px rgba(0,0,0,0.18);display:flex;flex-direction:column}
+.panel.open{transform:translateX(0)}
+.panel-head{display:flex;align-items:center;gap:10px;padding:52px 16px 12px;border-bottom:1px solid #EBEBEB}
+.panel-head .t{flex:1;min-width:0}
+.panel-head .t b{display:block;font-size:15px;font-weight:800}
+.panel-head .t span{display:block;font-size:12px;color:var(--muted)}
+.log{flex:1;min-height:0;overflow-y:auto;padding:14px 16px 24px;display:flex;flex-direction:column;gap:12px}
+.log-item{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.45}
+.log-ic{width:26px;height:26px;border-radius:8px;flex:none;display:inline-flex;align-items:center;justify-content:center;background:var(--soft);color:var(--ink)}
+.log-ic.agent{background:var(--brand);color:#FFFFFF}
+.log-ic.owner{background:var(--ink);color:#FFFFFF}
+.log-item small{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:2px}
+.log-empty{font-size:13px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.panel,.scrim{transition:none}}
+
 @media (max-width:640px){
   .topbar{padding:12px 16px}
   .brand small{display:none}
@@ -133,6 +166,13 @@ var PEOPLE = {
   Lin: { name: 'Lin', color: '#B5541B', label: 'Invited' }
 };
 var ORDER = ['Mei', 'Ray', 'Lin'];
+/* What each person's own agent knows (sample data for the demo). */
+var KNOW = {
+  Ray: { calendar: 'Busy 18:00–18:40 (team standup), free after', prefs: 'Skips spicy food, usually picks noodles',
+         draft: "I'm in. I can be there from 18:45. Noodles work for me, nothing spicy please." },
+  Lin: { calendar: 'Busy 18:00–18:50 (gym), free from 19:00', prefs: 'Vegetarian, prefers somewhere quiet',
+         draft: "Count me in from 19:00. I'm vegetarian, so I need a veggie option. Somewhere quiet would be great." }
+};
 var QS = [
   { q: 'When does this need to be settled?', k: 'Settle by', chips: ['Tonight', 'This week', 'No rush'] },
   { q: 'Is there a budget to stay within?', k: 'Budget', chips: ['Under NT$ 5,000', 'NT$ 5,000–10,000', 'No budget'] },
@@ -143,51 +183,91 @@ var EXAMPLES = ['Dinner for the three teams tonight', 'Pick a venue for Friday',
 
 var S;
 function fresh() {
-  S = { step: 'topic', topic: '', answers: [], created: false, joined: { Ray: false, Lin: false }, messages: [], typing: false };
+  S = { step: 'topic', topic: '', answers: [], created: false, joined: { Ray: false, Lin: false }, messages: [], typing: false,
+        proposals: {}, sent: { Ray: false, Lin: false }, planApproved: false,
+        panel: { Mei: false, Ray: false, Lin: false },
+        log: { Mei: [], Ray: [{ who: 'agent', text: 'Watching for invitations for Ray.' }], Lin: [{ who: 'agent', text: 'Watching for invitations for Lin.' }] } };
 }
 fresh();
+function log(p, who, text) { S.log[p].push({ who: who, text: text }); }
 
 function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function title() { return S.topic.trim() || 'New room'; }
 var ARROW = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>';
 var BACK = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>';
-var SPARK = '<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z"></path></svg>';
+var MENU = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>';
+var CLOSE = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>';
+var SPARK = '<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z"></path></svg>';
+var CAL = '<svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>';
+var HEART = '<svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"></path></svg>';
+var CHAT = '<svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg>';
+var USER = '<svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>';
 var LOCK = '<svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>';
 
 function avatar(p, pending) { return '<span class="av' + (pending ? ' pending' : '') + '" style="background:' + PEOPLE[p].color + '" title="' + p + '">' + p.charAt(0) + '</span>'; }
 function members() { return ['Mei'].concat(['Ray', 'Lin'].filter(function (p) { return S.joined[p]; })); }
+function menuBtn(p) { return '<button type="button" class="icon-btn menu-btn" data-act="panel" data-who="' + p + '" aria-label="Open ' + p + '\'s agent log" aria-expanded="' + (S.panel[p] ? 'true' : 'false') + '">' + MENU + '</button>'; }
+function aiWho(label) { return '<div class="ai-who"><span class="ai-dot" style="color:#FFFFFF">' + SPARK + '</span>' + label + '</div>'; }
 
-/* ---------- AI (scripted for the demo) ---------- */
-function aiSay(msgs, delay) {
-  S.typing = true; render();
-  setTimeout(function () { S.typing = false; msgs.forEach(function (m) { S.messages.push(m); }); render(); }, delay || 900);
-}
+/* ---------- scripted AI ---------- */
+function later(fn, ms) { S.typing = true; render(); setTimeout(function () { S.typing = false; fn(); render(); }, ms || 900); }
 function createRoom() {
   S.created = true; S.step = 'room';
   S.messages.push({ kind: 'system', text: 'Mei created the room' });
   S.messages.push({ kind: 'brief' });
-  S.messages.push({ kind: 'private', to: 'Mei', text: 'You have the final say here. Anything that costs money or can\'t be undone waits for your approval, and runs once.' });
+  log('Mei', 'agent', 'Created the room “' + title() + '” and sent invitations to Ray and Lin.');
+  ['Ray', 'Lin'].forEach(function (p) { log(p, 'orch', 'Invitation from Mei: “' + title() + '”.'); log(p, 'agent', 'Told ' + p + ' about the invitation.'); });
   render();
-  aiSay([{ kind: 'ai', text: 'I\'ve invited Ray and Lin. Once they join, I\'ll ask what each of them needs and come back with options that fit your brief.' }]);
+  later(function () { S.messages.push({ kind: 'ai', text: "I've invited Ray and Lin. When they join, their own agents will draft an answer for each of them to approve." }); }, 800);
 }
 function join(p) {
   S.joined[p] = true;
   S.messages.push({ kind: 'system', text: p + ' joined' });
-  S.messages.push({ kind: 'private', to: p, text: 'Only you see this. Tell me anything you\'d rather not share with the room. I\'ll take it into account without showing it to anyone.' });
+  S.messages.push({ kind: 'ai', text: p + ', what works for you? Your agent can draft it for you.' });
+  log(p, 'owner', p + ' accepted the invitation and joined.');
+  log(p, 'orch', 'Orchestrator asked: what works for you?');
   render();
-  if (S.joined.Ray && S.joined.Lin) {
-    aiSay([{ kind: 'ai', text: 'Everyone\'s here. Ray, Lin: what matters most to you for “' + title() + '”? Reply here and I\'ll pull it together for Mei.' }], 1100);
-  }
+  setTimeout(function () {
+    var k = KNOW[p];
+    log(p, 'tool', 'Checked calendar: ' + k.calendar + '.');
+    log(p, 'tool', 'Looked at what I know about ' + p + ': ' + k.prefs + '.');
+    log(p, 'agent', 'Drafted an answer and asked ' + p + ' to approve or edit it.');
+    S.proposals[p] = { status: 'pending', text: k.draft };
+    S.messages.push({ kind: 'proposal', to: p });
+    render();
+  }, 1200);
+}
+function sendProposal(p, text, edited) {
+  text = text.trim(); if (!text) return;
+  S.proposals[p].status = 'sent'; S.proposals[p].text = text; S.sent[p] = true;
+  S.messages.push({ kind: 'user', from: p, text: text, viaAgent: true, edited: edited });
+  log(p, 'owner', p + (edited ? ' edited the draft and sent it.' : ' approved the draft as written.'));
+  log(p, 'agent', 'Posted the answer to the room.');
+  if (S.sent.Ray && S.sent.Lin) {
+    later(function () {
+      S.messages.push({ kind: 'ai', text: 'Both answers are in. Plan: start at 19:00 so everyone can make it, include a veggie option, nothing spicy, somewhere quiet, within the budget. Mei, over to you.' });
+      S.messages.push({ kind: 'approve', to: 'Mei' });
+      log('Mei', 'orch', 'Ray and Lin answered. Orchestrator drafted a plan for you to approve.');
+    }, 1100);
+  } else { render(p); }
+}
+function approvePlan() {
+  S.planApproved = true;
+  S.messages.push({ kind: 'system', text: 'Mei approved the plan' });
+  log('Mei', 'owner', 'Mei approved the plan.');
+  ['Ray', 'Lin'].forEach(function (p) { log(p, 'orch', 'Mei approved the plan. Nothing else needed from ' + p + '.'); });
+  later(function () { S.messages.push({ kind: 'ai', text: "Done. I'll book it and post the details here. (Booking runs as a mock in this demo.)" }); }, 900);
 }
 function post(from, text) {
   text = text.trim(); if (!text) return;
   S.messages.push({ kind: 'user', from: from, text: text });
+  log(from, 'owner', from + ' wrote to the room: “' + text + '”');
   render(from);
 }
 
 /* ---------- screens ---------- */
 function hostTopic() {
-  return '<div class="appbar"><div class="avatars">' + avatar('Mei') + '</div><div style="flex:1"></div><span class="eyebrow">New topic</span></div>' +
+  return '<div class="appbar"><div class="avatars">' + avatar('Mei') + '</div><span class="eyebrow" style="margin-left:6px">New topic</span>' + menuBtn('Mei') + '</div>' +
     '<div class="body">' +
     '<p class="eyebrow" style="margin-top:6px">Hi Mei</p>' +
     '<h1 class="h1">What do you want to decide together?</h1>' +
@@ -199,20 +279,18 @@ function hostTopic() {
 }
 function hostQuestions() {
   var n = S.answers.length, cur = n < QS.length ? QS[n] : null, h = [];
-  h.push('<div class="appbar"><button type="button" class="icon-btn" data-act="back-topic" aria-label="Back">' + BACK + '</button><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:700">Set up the room</div><div style="font-size:12px;color:var(--muted)">' + (cur ? 'Question ' + (n + 1) + ' of ' + QS.length : 'All set') + '</div></div></div>');
+  h.push('<div class="appbar"><button type="button" class="icon-btn" data-act="back-topic" aria-label="Back">' + BACK + '</button><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:700">Set up the room</div><div style="font-size:12px;color:var(--muted)">' + (cur ? 'Question ' + (n + 1) + ' of ' + QS.length : 'All set') + '</div></div>' + menuBtn('Mei') + '</div>');
   h.push('<div class="progress" aria-hidden="true"><div style="width:' + Math.round(n / QS.length * 100) + '%"></div></div>');
   h.push('<div class="chat"><div class="chat-inner">');
   h.push('<div class="msg right"><div class="bubble b-mine">' + esc(title()) + '</div></div>');
   S.answers.forEach(function (a, i) {
-    h.push('<div class="msg left"><div class="ai-who"><span class="ai-dot">' + SPARK + '</span>Orchestrator</div><div class="bubble b-ai">' + esc(QS[i].q) + '</div></div>');
+    h.push('<div class="msg left">' + aiWho('Orchestrator') + '<div class="bubble b-ai">' + esc(QS[i].q) + '</div></div>');
     h.push('<div class="msg right"><div class="bubble b-mine">' + esc(a) + '</div></div>');
   });
   if (cur) {
-    h.push('<div class="msg left"><div class="ai-who"><span class="ai-dot">' + SPARK + '</span>Orchestrator</div><div class="bubble b-ai" style="font-weight:700">' + esc(cur.q) + '</div></div>');
+    h.push('<div class="msg left">' + aiWho('Orchestrator') + '<div class="bubble b-ai" style="font-weight:700">' + esc(cur.q) + '</div></div>');
     h.push('<div class="chips" role="group" aria-label="Suggested answers">' + cur.chips.map(function (c) { return '<button type="button" class="chip" data-act="answer" data-val="' + esc(c) + '">' + esc(c) + '</button>'; }).join('') + '</div>');
-  } else {
-    h.push(briefCard(true));
-  }
+  } else { h.push(briefCard(true)); }
   h.push('</div></div>');
   if (cur) h.push('<div class="foot"><div class="row"><label for="ans-Mei" class="sr">Your own answer</label><input id="ans-Mei" class="input" type="text" placeholder="Or type your own answer" data-enter="answer"><button type="button" class="send" data-act="answer-typed" aria-label="Send answer">' + ARROW + '</button></div></div>');
   else h.push('<div class="foot"><button type="button" class="primary" data-act="create">Create chat room</button></div>');
@@ -223,7 +301,7 @@ function briefCard(editable) {
     (editable ? '<button type="button" class="ghost" data-act="redo" style="align-self:flex-start">Change answers</button>' : '') + '</div>';
 }
 function guestInvite(p) {
-  var h = '<div class="appbar"><div class="avatars">' + avatar(p) + '</div><div style="flex:1"></div><span class="eyebrow">Invitation</span></div><div class="body">';
+  var h = '<div class="appbar"><div class="avatars">' + avatar(p) + '</div><span class="eyebrow" style="margin-left:6px">Invitation</span>' + menuBtn(p) + '</div><div class="body">';
   h += '<div class="invite-hero"><span class="host-av" aria-hidden="true">M</span>' +
        '<div><p class="eyebrow" style="color:#7A2A3B">Mei invited you</p><h1 class="h1" style="font-size:24px;margin-top:6px">' + (S.created ? esc(title()) : 'A new room') + '</h1></div>' +
        (S.created ? '' : '<div class="waiting"><span class="spinner" aria-hidden="true"></span>Mei is still setting it up…</div>') + '</div>';
@@ -231,25 +309,61 @@ function guestInvite(p) {
     h += '<div class="card" style="gap:6px">' + S.answers.map(function (a, i) { return '<div class="kv" style="' + (i === 0 ? 'border-top:0;padding-top:0' : '') + '"><span>' + esc(QS[i].k) + '</span><span>' + esc(a) + '</span></div>'; }).join('') + '</div>';
     h += '<div class="row" style="gap:12px"><div class="avatars">' + avatar('Mei') + avatar('Ray', !S.joined.Ray) + avatar('Lin', !S.joined.Lin) + '</div><span style="font-size:13px;color:var(--muted)">' + members().length + ' of 3 in the room</span></div>';
   }
-  h += '<p class="lead" style="font-size:14px">In the room you see shared messages and your own items. Nobody else sees what\'s marked “Only you”.</p></div>';
+  h += '<p class="lead" style="font-size:14px">After you join, your own agent checks your calendar and drafts an answer for you to approve. Nobody else sees what\'s marked “Only you”.</p></div>';
   h += '<div class="foot"><button type="button" class="primary" data-act="join" data-who="' + p + '"' + (S.created ? '' : ' disabled') + '>' + (S.created ? 'Join the chat' : 'Waiting for Mei') + '</button></div>';
   return h;
 }
+function proposalCard(p) {
+  var pr = S.proposals[p], k = KNOW[p];
+  var h = '<div class="proposal"><span class="pill">' + LOCK + 'Only you · ' + p + '\'s agent</span>';
+  if (pr.status === 'sent') return h + '<div class="done-note">You sent this to the room.</div></div>';
+  h += '<div class="steps"><div>' + CAL + '<span>' + esc(k.calendar) + '</span></div><div>' + HEART + '<span>' + esc(k.prefs) + '</span></div></div>';
+  if (pr.status === 'editing') {
+    h += '<label for="edit-' + p + '" class="sr">Edit the answer</label><textarea id="edit-' + p + '" class="edit">' + esc(pr.text) + '</textarea>';
+    h += '<div class="btns"><button type="button" class="btn-sm line" data-act="cancel-edit" data-who="' + p + '">Cancel</button><button type="button" class="btn-sm solid" data-act="send-edit" data-who="' + p + '">Send</button></div>';
+  } else {
+    h += '<div style="font-size:13px;font-weight:700">I\'d answer for you:</div><div class="quote">' + esc(pr.text) + '</div>';
+    h += '<div class="btns"><button type="button" class="btn-sm line" data-act="edit" data-who="' + p + '">Edit</button><button type="button" class="btn-sm solid" data-act="approve" data-who="' + p + '">Approve &amp; send</button></div>';
+  }
+  return h + '</div>';
+}
+function approveCard() {
+  var h = '<div class="proposal"><span class="pill">' + LOCK + 'Only you · final call</span>';
+  if (S.planApproved) return h + '<div class="done-note">You approved this plan.</div></div>';
+  return h + '<div class="quote">Start at 19:00 · veggie option · nothing spicy · somewhere quiet · within budget</div>' +
+    '<div class="btns"><button type="button" class="btn-sm line" data-act="change-plan">Change</button><button type="button" class="btn-sm solid" data-act="approve-plan">Approve plan</button></div></div>';
+}
 function chat(p) {
-  var h = '<div class="appbar bordered"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(title()) + '</div><div style="font-size:12px;color:var(--muted)">' + members().join(', ') + '</div></div><div class="avatars">' + avatar('Mei') + avatar('Ray', !S.joined.Ray) + avatar('Lin', !S.joined.Lin) + '</div></div>';
+  var h = '<div class="appbar bordered"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(title()) + '</div><div style="font-size:12px;color:var(--muted)">' + members().join(', ') + '</div></div><div class="avatars">' + avatar('Mei') + avatar('Ray', !S.joined.Ray) + avatar('Lin', !S.joined.Lin) + '</div>' + menuBtn(p) + '</div>';
   h += '<div class="chat"><div class="chat-inner">';
   S.messages.forEach(function (m) {
-    if (m.kind === 'private' && m.to !== p) return;
+    if ((m.kind === 'proposal' || m.kind === 'approve') && m.to !== p) return;
     if (m.kind === 'system') h += '<p class="sys">' + esc(m.text) + '</p>';
-    else if (m.kind === 'brief') h += '<div class="msg left" style="max-width:100%;align-self:stretch"><div class="ai-who"><span class="ai-dot">' + SPARK + '</span>Orchestrator · room brief</div>' + briefCard(false) + '</div>';
-    else if (m.kind === 'ai') h += '<div class="msg left"><div class="ai-who"><span class="ai-dot">' + SPARK + '</span>Orchestrator</div><div class="bubble b-ai">' + esc(m.text) + '</div></div>';
-    else if (m.kind === 'private') h += '<div class="private"><span class="pill">' + LOCK + 'Only you</span>' + esc(m.text) + '</div>';
-    else if (m.from === p) h += '<div class="msg right"><div class="bubble b-mine">' + esc(m.text) + '</div></div>';
-    else h += '<div class="msg left"><div class="who">' + esc(m.from) + '</div><div class="bubble b-other">' + esc(m.text) + '</div></div>';
+    else if (m.kind === 'brief') h += '<div class="msg left" style="max-width:100%;align-self:stretch">' + aiWho('Orchestrator · room brief') + briefCard(false) + '</div>';
+    else if (m.kind === 'ai') h += '<div class="msg left">' + aiWho('Orchestrator') + '<div class="bubble b-ai">' + esc(m.text) + '</div></div>';
+    else if (m.kind === 'proposal') h += proposalCard(p);
+    else if (m.kind === 'approve') h += approveCard();
+    else {
+      var tag = m.viaAgent ? '<div class="who" style="margin:4px 4px 0;font-weight:600">' + (m.edited ? 'Edited from agent draft' : 'Drafted by agent · approved') + '</div>' : '';
+      if (m.from === p) h += '<div class="msg right"><div class="bubble b-mine">' + esc(m.text) + '</div>' + tag.replace('margin:4px 4px 0', 'margin:4px 4px 0;text-align:right') + '</div>';
+      else h += '<div class="msg left"><div class="who">' + esc(m.from) + '</div><div class="bubble b-other">' + esc(m.text) + '</div>' + tag + '</div>';
+    }
   });
-  if (S.typing) h += '<div class="msg left"><div class="ai-who"><span class="ai-dot">' + SPARK + '</span>Orchestrator</div><div class="b-ai typing" aria-label="Orchestrator is typing"><i></i><i></i><i></i></div></div>';
+  if (S.typing) h += '<div class="msg left">' + aiWho('Orchestrator') + '<div class="b-ai typing" aria-label="Orchestrator is typing"><i></i><i></i><i></i></div></div>';
   h += '</div></div>';
   h += '<div class="foot"><div class="row"><label for="msg-' + p + '" class="sr">Message as ' + p + '</label><input id="msg-' + p + '" class="input" type="text" placeholder="Message" data-enter="send" data-who="' + p + '"><button type="button" class="send" data-act="send" data-who="' + p + '" aria-label="Send">' + ARROW + '</button></div></div>';
+  return h;
+}
+var LOG_ICON = { agent: ['agent', SPARK, 'Agent'], tool: ['', CAL, 'Agent · tool'], owner: ['owner', USER, 'You'], orch: ['', CHAT, 'Orchestrator'] };
+function panel(p) {
+  var items = S.log[p];
+  var h = '<div class="scrim' + (S.panel[p] ? ' open' : '') + '" data-act="panel" data-who="' + p + '" data-scrim="' + p + '"></div>';
+  h += '<aside class="panel' + (S.panel[p] ? ' open' : '') + '" data-panel="' + p + '" aria-label="' + p + '\'s agent log"' + (S.panel[p] ? '' : ' aria-hidden="true" inert') + '>';
+  h += '<div class="panel-head"><span class="log-ic agent" aria-hidden="true">' + SPARK + '</span><div class="t"><b>' + p + '\'s agent</b><span>What it did and why</span></div><button type="button" class="icon-btn" data-act="panel" data-who="' + p + '" aria-label="Close agent log">' + CLOSE + '</button></div>';
+  h += '<div class="log">' + (items.length ? items.map(function (it) {
+    var ic = LOG_ICON[it.who];
+    return '<div class="log-item"><span class="log-ic ' + ic[0] + '" aria-hidden="true">' + ic[1] + '</span><div><small>' + (it.who === 'owner' ? p : ic[2]) + '</small>' + esc(it.text) + '</div></div>';
+  }).join('') : '<p class="log-empty">Nothing yet. Start a topic and the steps show up here.</p>') + '</div></aside>';
   return h;
 }
 function screen(p) {
@@ -264,11 +378,19 @@ function render(focusWho) {
   document.getElementById('stage').innerHTML = ORDER.map(function (p, i) {
     var P = PEOPLE[p];
     return '<section class="col" aria-label="Phone ' + (i + 1) + ': ' + p + '"><div class="frame-label"><span class="dot" style="background:' + P.color + '"></span><b>' + (i + 1) + ' · ' + p + '</b>' + P.label + '</div>' +
-      '<div class="phone"><div class="screen"><div class="island" aria-hidden="true"></div>' + screen(p) + '</div></div></section>';
+      '<div class="phone"><div class="screen"><div class="island" aria-hidden="true"></div>' + screen(p) + panel(p) + '</div></div></section>';
   }).join('');
-  Object.keys(keep).forEach(function (id) { var el = document.getElementById(id); if (el && id !== 'topic' && !(focusWho && id === 'msg-' + focusWho)) el.value = keep[id]; });
+  Object.keys(keep).forEach(function (id) { var el = document.getElementById(id); if (el && id !== 'topic' && id.indexOf('edit-') !== 0 && !(focusWho && id === 'msg-' + focusWho)) el.value = keep[id]; });
   var f = focusWho ? document.getElementById('msg-' + focusWho) : (active ? document.getElementById(active) : null);
   if (f) { f.focus({ preventScroll: true }); if (f.setSelectionRange && f.value) f.setSelectionRange(f.value.length, f.value.length); }
+}
+function togglePanel(p) {
+  S.panel[p] = !S.panel[p];
+  var pn = document.querySelector('[data-panel="' + p + '"]'), sc = document.querySelector('[data-scrim="' + p + '"]');
+  pn.classList.toggle('open', S.panel[p]); sc.classList.toggle('open', S.panel[p]);
+  if (S.panel[p]) { pn.removeAttribute('aria-hidden'); pn.removeAttribute('inert'); var c = pn.querySelector('[data-act="panel"]'); if (c) c.focus(); }
+  else { pn.setAttribute('aria-hidden', 'true'); pn.setAttribute('inert', ''); }
+  document.querySelectorAll('.menu-btn[data-who="' + p + '"]').forEach(function (b) { b.setAttribute('aria-expanded', S.panel[p] ? 'true' : 'false'); });
 }
 
 /* ---------- events ---------- */
@@ -280,23 +402,32 @@ stage.addEventListener('input', function (e) {
   }
 });
 stage.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') { ORDER.forEach(function (p) { if (S.panel[p]) togglePanel(p); }); return; }
   if (e.key !== 'Enter' || e.isComposing) return;
   var t = e.target;
   if (t.getAttribute('data-enter') === 'send') { post(t.getAttribute('data-who'), t.value); }
-  if (t.getAttribute('data-enter') === 'answer' && t.value.trim()) { S.answers.push(t.value.trim()); render(); var n = document.getElementById('ans-Mei'); if (n) n.focus(); }
+  if (t.getAttribute('data-enter') === 'answer' && t.value.trim()) { addAnswer(t.value.trim()); var n = document.getElementById('ans-Mei'); if (n) n.focus(); }
 });
+function addAnswer(a) { var i = S.answers.length; S.answers.push(a); log('Mei', 'orch', 'Orchestrator asked: ' + QS[i].q); log('Mei', 'owner', 'Mei answered: ' + a); render(); }
 stage.addEventListener('click', function (e) {
   var b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
   var act = b.getAttribute('data-act'), val = b.getAttribute('data-val'), who = b.getAttribute('data-who');
-  if (act === 'example') { S.topic = val; render(); }
-  else if (act === 'to-questions') { if (S.topic.trim()) { S.step = 'questions'; render(); } }
+  if (act === 'panel') { togglePanel(who); }
+  else if (act === 'example') { S.topic = val; render(); }
+  else if (act === 'to-questions') { if (S.topic.trim()) { S.step = 'questions'; log('Mei', 'owner', 'Mei started a topic: “' + title() + '”.'); log('Mei', 'agent', 'Asked the Orchestrator to set up a room and clarify the topic.'); render(); } }
   else if (act === 'back-topic') { S.step = 'topic'; render(); }
-  else if (act === 'answer') { S.answers.push(val); render(); }
-  else if (act === 'answer-typed') { var i = document.getElementById('ans-Mei'); if (i && i.value.trim()) { S.answers.push(i.value.trim()); render(); } }
-  else if (act === 'redo') { S.answers = []; render(); }
+  else if (act === 'answer') { addAnswer(val); }
+  else if (act === 'answer-typed') { var i = document.getElementById('ans-Mei'); if (i && i.value.trim()) addAnswer(i.value.trim()); }
+  else if (act === 'redo') { S.answers = []; log('Mei', 'owner', 'Mei chose to change the answers.'); render(); }
   else if (act === 'create') { createRoom(); }
   else if (act === 'join') { join(who); }
-  else if (act === 'send') { var m = document.getElementById('msg-' + who); if (m) post(who, m.value); }
+  else if (act === 'approve') { sendProposal(who, S.proposals[who].text, false); }
+  else if (act === 'edit') { S.proposals[who].status = 'editing'; render(); var ed = document.getElementById('edit-' + who); if (ed) { ed.focus(); ed.setSelectionRange(ed.value.length, ed.value.length); } }
+  else if (act === 'cancel-edit') { S.proposals[who].status = 'pending'; render(); }
+  else if (act === 'send-edit') { var ta = document.getElementById('edit-' + who); if (ta) sendProposal(who, ta.value, ta.value.trim() !== S.proposals[who].text); }
+  else if (act === 'approve-plan') { approvePlan(); }
+  else if (act === 'change-plan') { var m = document.getElementById('msg-Mei'); if (m) { m.value = 'Can we change: '; m.focus(); } }
+  else if (act === 'send') { var mm = document.getElementById('msg-' + who); if (mm) post(who, mm.value); }
 });
 document.getElementById('reset').addEventListener('click', function () { fresh(); render(); });
 render();
