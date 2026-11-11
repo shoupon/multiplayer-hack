@@ -1,6 +1,6 @@
 PY := .venv/bin/python
 
-.PHONY: install check serve demo viz mcp clean
+.PHONY: install check serve demo viz demo-celebration mcp clean
 
 install:
 	python3 -m venv .venv
@@ -18,6 +18,9 @@ demo:
 
 viz:
 	$(PY) -m demo.viz
+
+demo-celebration:
+	$(PY) -m demo.celebration $(ARGS)
 
 mcp:
 	$(PY) -m fcl.mcp_server
