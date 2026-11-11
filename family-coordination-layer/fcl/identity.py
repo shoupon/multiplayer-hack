@@ -34,7 +34,7 @@ def create_user(ctx: Ctx, display_name: str) -> dict[str, Any]:
         credential_id, token = insert_credential(c, "user", user_id, "signup", now)
         audit.record(c, now, UserPrincipal(user_id, credential_id), "user.create", "succeeded",
                      resource_type="user", resource_id=user_id)
-    return {"user": {"id": user_id, "display_name": display_name}, "token": token}
+    return {"id": user_id, "display_name": display_name, "token": token}
 
 
 def me(ctx: Ctx, user_id: str) -> dict[str, Any]:

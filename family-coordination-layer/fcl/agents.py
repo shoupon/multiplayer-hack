@@ -60,12 +60,8 @@ def register_agent(
         credential_id, token = insert_credential(c, "agent", agent_id, "initial", now)
         audit.record(c, now, p, "agent.register", "succeeded", resource_type="agent", resource_id=agent_id,
                      metadata={"provider": provider, "grants": len(created)})
-    return {
-        "agent": {"id": agent_id, "owner_user_id": p.user_id, "display_name": display_name, "provider": provider,
-                  "capabilities": caps, "transports": kinds},
-        "grants": created,
-        "credential": {"id": credential_id, "token": token},
-    }
+    return {"id": agent_id, "owner_user_id": p.user_id, "display_name": display_name, "provider": provider,
+            "capabilities": caps, "transports": kinds, "grants": created, "credential_id": credential_id, "token": token}
 
 
 def issue_credential(ctx: Ctx, p: UserPrincipal, agent_id: str, label: Optional[str]) -> dict[str, str]:

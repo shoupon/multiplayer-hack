@@ -273,7 +273,7 @@ CREATE TABLE webhook_subscriptions (
   id                 TEXT PRIMARY KEY,
   agent_id           TEXT NOT NULL REFERENCES agents(id),
   url                TEXT NOT NULL,
-  secret_ciphertext  TEXT NOT NULL,
+  secret_salt        TEXT NOT NULL,
   status             TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
   created_at         TEXT NOT NULL,
   disabled_at        TEXT

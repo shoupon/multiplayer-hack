@@ -16,13 +16,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from . import agents, audit, families, grants, identity
+from . import agents, approvals, audit, families, grants, identity, messaging, tasks, webhooks
 from .agents import GrantSpec
 from .auth import AgentPrincipal, Principal, UserPrincipal, acting_user_id, resolve_principal
 from .context import Ctx
 from .errors import AppError, DeniedAudit, bad_request, forbidden, unauthenticated
 from .ids import id_pattern
+from .messaging import request_hash
 from .policy import Action
+from .proposal import INTENT_PATTERN, Proposal
 
 ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     400: {"description": "Invalid request"},
@@ -89,6 +91,50 @@ class RegisterAgentBody(Body):
 
 class IssueCredentialBody(Body):
     label: Optional[str] = Field(default=None, max_length=100)
+
+
+class SendMessageBody(Body):
+    family_id: str = Field(pattern=id_pattern("family"))
+    to_agent_id: str = Field(pattern=id_pattern("agent"))
+    type: str = Field(max_length=64)
+    payload: dict[str, Any]
+    conversation_id: Optional[str] = Field(default=None, pattern=id_pattern("conversation"))
+    correlation_id: Optional[str] = Field(default=None, max_length=100)
+    causation_id: Optional[str] = Field(default=None, pattern=id_pattern("message"))
+    requires_response: bool = False
+    expires_at: Optional[AwareDatetime] = None
+
+
+class AckBody(Body):
+    through: int = Field(ge=0)
+
+
+class CreateTaskBody(Body):
+    family_id: str = Field(pattern=id_pattern("family"))
+    invitees: list[str] = Field(min_length=1, max_length=10, description="Agent ids of the other participants.")
+    intent: str = Field(pattern=INTENT_PATTERN)
+    proposal: Proposal
+    expires_at: AwareDatetime
+
+
+class RespondBody(Body):
+    kind: Literal["accept", "decline", "counterpropose", "complete"]
+    proposal_version: int = Field(ge=1)
+    proposal: Optional[Proposal] = None
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class CancelBody(Body):
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class DecisionBody(Body):
+    decision: Literal["grant", "deny"]
+
+
+class WebhookBody(Body):
+    agent_id: str = Field(pattern=id_pattern("agent"))
+    url: str = Field(max_length=2000)
 
 
 # ---- middleware ------------------------------------------------------------------------
@@ -301,6 +347,90 @@ def create_app(ctx: Ctx, lifespan_hooks: Optional[list[Callable[[], Callable[[],
     @app.delete("/v1/grants/{grant_id}", status_code=204, tags=["grants"])
     def revoke_grant(grant_id: str = IdPath("grant"), p: UserPrincipal = Depends(user)) -> Response:
         grants.revoke_grant(ctx, p, grant_id)
+        return Response(status_code=204)
+
+    # ---- messages ----
+
+    @app.post("/v1/messages", tags=["messages"])
+    def send_message(body: SendMessageBody, response: Response, p: AgentPrincipal = Depends(agent),
+                     key: str = Depends(idempotency_key)) -> dict[str, Any]:
+        created, env = messaging.send_direct(
+            ctx, p, idempotency_key=key, req_hash=request_hash(body.model_dump(mode="json")), family_id=body.family_id,
+            to_agent_id=body.to_agent_id, message_type=body.type, payload=body.payload,
+            conversation_id=body.conversation_id, correlation_id=body.correlation_id, causation_id=body.causation_id,
+            requires_response=body.requires_response, expires_at=body.expires_at,
+        )
+        response.status_code = 201 if created else 200
+        return env
+
+    @app.get("/v1/messages/{message_id}", tags=["messages"])
+    def get_message(message_id: str = IdPath("message"), p: Principal = Depends(principal)) -> dict[str, Any]:
+        return messaging.get_message(ctx, p, message_id)
+
+    @app.get("/v1/agents/{agent_id}/inbox", tags=["messages"])
+    def get_inbox(agent_id: str = IdPath("agent"), after: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=200),
+                  p: AgentPrincipal = Depends(agent)) -> dict[str, Any]:
+        return messaging.inbox(ctx, p, agent_id, after, limit)
+
+    @app.post("/v1/agents/{agent_id}/inbox/ack", tags=["messages"])
+    def ack_inbox(body: AckBody, agent_id: str = IdPath("agent"), p: AgentPrincipal = Depends(agent)) -> dict[str, int]:
+        return {"acknowledged": messaging.acknowledge(ctx, p, agent_id, body.through)}
+
+    # ---- tasks ----
+
+    @app.post("/v1/tasks", tags=["tasks"])
+    def create_task(body: CreateTaskBody, response: Response, p: AgentPrincipal = Depends(agent),
+                    key: str = Depends(idempotency_key)) -> dict[str, Any]:
+        created, task = tasks.create(
+            ctx, p, idempotency_key=key, req_hash=request_hash(body.model_dump(mode="json")), family_id=body.family_id,
+            invitee_agent_ids=body.invitees, intent=body.intent, proposal=body.proposal, expires_at=body.expires_at,
+        )
+        response.status_code = 201 if created else 200
+        return task
+
+    @app.get("/v1/tasks", tags=["tasks"])
+    def list_tasks(state: Optional[str] = Query(None, max_length=32), limit: int = Query(50, ge=1, le=200),
+                   p: Principal = Depends(principal)) -> dict[str, Any]:
+        return {"items": tasks.list_for(ctx, p, state, limit)}
+
+    @app.get("/v1/tasks/{task_id}", tags=["tasks"])
+    def get_task(task_id: str = IdPath("task"), p: Principal = Depends(principal)) -> dict[str, Any]:
+        return tasks.get(ctx, p, task_id)
+
+    @app.post("/v1/tasks/{task_id}/responses", tags=["tasks"])
+    def respond(body: RespondBody, task_id: str = IdPath("task"), p: AgentPrincipal = Depends(agent),
+                key: str = Depends(idempotency_key)) -> dict[str, Any]:
+        if (body.kind == "counterpropose") != (body.proposal is not None):
+            raise bad_request("invalid_request", "proposal is required for counterpropose and only allowed there")
+        return tasks.respond(ctx, p, task_id, idempotency_key=key, req_hash=request_hash(body.model_dump(mode="json")),
+                             kind=body.kind, proposal_version=body.proposal_version, proposal=body.proposal,
+                             reason=body.reason)
+
+    @app.post("/v1/tasks/{task_id}/cancel", tags=["tasks"])
+    def cancel_task(body: CancelBody, task_id: str = IdPath("task"), p: AgentPrincipal = Depends(agent)) -> dict[str, Any]:
+        return tasks.cancel(ctx, p, task_id, body.reason)
+
+    # ---- approvals ----
+
+    @app.get("/v1/approvals", tags=["approvals"])
+    def list_approvals(status: Optional[Literal["pending", "granted", "denied", "expired", "superseded"]] = None,
+                       p: UserPrincipal = Depends(user)) -> dict[str, Any]:
+        return {"items": approvals.list_for(ctx, p, status)}
+
+    @app.post("/v1/approvals/{approval_id}/decisions", tags=["approvals"])
+    def decide_approval(body: DecisionBody, approval_id: str = IdPath("approval"), p: UserPrincipal = Depends(user)) -> dict[str, Any]:
+        """Human-only: an agent credential is rejected even when it belongs to the approver."""
+        return approvals.decide(ctx, p, approval_id, body.decision)
+
+    # ---- webhooks ----
+
+    @app.post("/v1/webhooks", status_code=201, tags=["webhooks"])
+    def subscribe_webhook(body: WebhookBody, p: UserPrincipal = Depends(user)) -> dict[str, Any]:
+        return webhooks.subscribe(ctx, p, body.agent_id, body.url)
+
+    @app.delete("/v1/webhooks/{webhook_id}", status_code=204, tags=["webhooks"])
+    def unsubscribe_webhook(webhook_id: str = IdPath("webhook"), p: UserPrincipal = Depends(user)) -> Response:
+        webhooks.unsubscribe(ctx, p, webhook_id)
         return Response(status_code=204)
 
     # ---- audit ----

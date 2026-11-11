@@ -18,8 +18,8 @@ Clock = Callable[[], datetime]
 class Settings:
     db_path: Path = Path(".data/fcl.db")
     host: str = "127.0.0.1"
-    port: int = 8787
-    encryption_key: bytes | None = None
+    port: int = 8000
+    server_key: bytes | None = None
     allow_loopback_webhooks: bool = False
     max_negotiations: int = 5
     max_task_ttl_seconds: int = 14 * 24 * 3600
@@ -31,12 +31,12 @@ class Settings:
     @staticmethod
     def from_env(env: dict[str, str] | None = None) -> "Settings":
         e = dict(os.environ if env is None else env)
-        key = e.get("FCL_ENCRYPTION_KEY")
+        key = e.get("FCL_SERVER_KEY")
         return Settings(
             db_path=Path(e.get("FCL_DB_PATH", ".data/fcl.db")),
             host=e.get("FCL_HOST", "127.0.0.1"),
-            port=int(e.get("FCL_PORT", "8787")),
-            encryption_key=base64.b64decode(key) if key else None,
+            port=int(e.get("FCL_PORT", "8000")),
+            server_key=base64.b64decode(key) if key else None,
             allow_loopback_webhooks=e.get("FCL_ALLOW_LOOPBACK_WEBHOOKS", "false") == "true",
             max_negotiations=int(e.get("FCL_MAX_NEGOTIATIONS", "5")),
             max_task_ttl_seconds=int(e.get("FCL_MAX_TASK_TTL_HOURS", str(14 * 24))) * 3600,

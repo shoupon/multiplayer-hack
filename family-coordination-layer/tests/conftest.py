@@ -101,7 +101,7 @@ class Family:
 
 def signup(api: Api, name: str) -> Member:
     body = api.ok("POST", "/v1/users", json={"display_name": name})
-    return Member(body["user"]["id"], body["token"])
+    return Member(body["id"], body["token"])
 
 
 def join(api: Api, admin: Member, family_id: str, member: Member) -> None:
@@ -115,7 +115,7 @@ def register(api: Api, m: Member, family_id: str, provider: str, grants: list[di
         "capabilities": ["receive_message", "propose_schedule"], "transports": ["inbox"],
         "grants": [{"family_id": family_id, **g} for g in grants],
     })
-    m.agent_id, m.agent_token = body["agent"]["id"], body["credential"]["token"]
+    m.agent_id, m.agent_token = body["id"], body["token"]
 
 
 def family_grants(wife_needs_approval: bool = False) -> tuple[list[dict], list[dict]]:
@@ -137,3 +137,39 @@ def build_family(api: Api, wife_needs_approval: bool = False) -> Family:
     register(api, husband, fam["id"], "custom-mcp", hg)
     register(api, wife, fam["id"], "companion", wg)
     return Family(fam["id"], husband, wife)
+
+
+def run_jobs(env: Env) -> int:
+    from fcl import worker
+
+    return worker.run_due(env.ctx)
+
+
+def inbox(env: Env, m: Member, after: int = 0) -> list[dict]:
+    return env.api.ok("GET", f"/v1/agents/{m.agent_id}/inbox", m.agent_token, params={"after": after})["items"]
+
+
+def text(env: Env, sender: Member, to: Member, family_id: str, body: str, idem: str) -> tuple[int, Any]:
+    return env.api.post("/v1/messages", sender.agent_token,
+                        {"family_id": family_id, "to_agent_id": to.agent_id, "type": "message.text", "payload": {"text": body}},
+                        idem=idem)
+
+
+DINNER_AT_7 = {"proposed_time": "2026-11-13T19:00:00+08:00", "duration_minutes": 90}
+DINNER_AT_730 = {"proposed_time": "2026-11-13T19:30:00+08:00", "duration_minutes": 90}
+
+
+def propose_dinner(env: Env, fam: Family, idem: str = "dinner-1", hours: int = 10) -> dict:
+    status, task = env.api.post("/v1/tasks", fam.husband.agent_token, {
+        "family_id": fam.id, "invitees": [fam.wife.agent_id], "intent": "schedule_dinner",
+        "proposal": DINNER_AT_7, "expires_at": (env.clock.now + timedelta(hours=hours)).isoformat(),
+    }, idem=idem)
+    assert status in (200, 201), task
+    return task
+
+
+def respond(env: Env, m: Member, task_id: str, kind: str, version: int, idem: str, proposal: Optional[dict] = None) -> tuple[int, Any]:
+    body: dict[str, Any] = {"kind": kind, "proposal_version": version}
+    if proposal is not None:
+        body["proposal"] = proposal
+    return env.api.post(f"/v1/tasks/{task_id}/responses", m.agent_token, body, idem=idem)

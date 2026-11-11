@@ -9,9 +9,9 @@ from .timeutil import utcnow
 
 @dataclass
 class Ctx:
-    """Everything a service needs: the database, the clock, settings, and the secret-encryption key."""
+    """Everything a service needs: the database, the clock, settings, and the server key that derives webhook secrets."""
 
     db: Database
     settings: Settings
-    encryption_key: bytes
+    server_key: bytes
     clock: Clock = field(default=utcnow)
