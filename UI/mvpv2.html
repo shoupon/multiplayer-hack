@@ -98,12 +98,35 @@ details summary{cursor:pointer;font-weight:700;font-size:14px;padding:6px 0}
 .note{font-size:12px;color:var(--muted);line-height:1.5}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:#FFFFFF;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
 .toast.show{opacity:1}
-.login{flex:1;display:flex;flex-direction:column;justify-content:space-between;padding:calc(56px + env(safe-area-inset-top)) 24px calc(28px + env(safe-area-inset-bottom));gap:28px}
-.login .hero{display:flex;flex-direction:column;gap:16px}
-.login .bigmark{width:64px;height:64px;border-radius:20px;background:var(--brand);display:inline-flex;align-items:center;justify-content:center;box-shadow:0 12px 28px rgba(215,38,76,0.28)}
-.login .h1{font-size:32px}
+.login{flex:1;display:flex;flex-direction:column;gap:24px;padding:calc(20px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom))}
+.login .brandrow{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:800;letter-spacing:-0.01em}
+.login .brandrow .mark{width:34px;height:34px;border-radius:10px}
+.login .mid{flex:1;display:flex;flex-direction:column;justify-content:center;gap:26px}
+.login .copy{display:flex;flex-direction:column;gap:10px}
+.login .h1{font-size:32px;line-height:1.1}
+.login .lead{font-size:16px}
+.art{border-radius:28px;padding:22px 14px 20px;background:#FFF5F7;background-image:radial-gradient(rgba(215,38,76,0.10) 1px,transparent 1px);background-size:16px 16px;display:flex;flex-direction:column;align-items:center}
+.art-prop{max-width:100%;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:#FFFFFF;box-shadow:0 4px 14px rgba(0,0,0,0.08);font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.art-prop i{width:8px;height:8px;border-radius:999px;background:#222222;flex:none}
+.art-stem{width:2px;height:18px;background:repeating-linear-gradient(#D7264C 0 4px,transparent 4px 8px)}
+.art-coord{display:inline-flex;align-items:center;gap:8px;padding:9px 16px 9px 9px;border-radius:999px;background:#D7264C;color:#FFFFFF;font-size:13px;font-weight:800;box-shadow:0 10px 24px rgba(215,38,76,0.32)}
+.art-coord span{width:26px;height:26px;border-radius:999px;background:rgba(255,255,255,0.22);display:inline-flex;align-items:center;justify-content:center}
+.art-lines{width:100%;height:34px;display:block}
+.art-lines path{fill:none;stroke:#D7264C;stroke-width:2;stroke-dasharray:4 5;animation:flow 1.4s linear infinite;vector-effect:non-scaling-stroke}
+.art-lines.out path{stroke:#0E6E52}
+@keyframes flow{to{stroke-dashoffset:-18}}
+.art-agents{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.art-agent{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:16px;background:#FFFFFF;box-shadow:0 4px 14px rgba(0,0,0,0.07)}
+.art-agent .av{width:32px;height:32px;border-radius:10px;font-size:11px}
+.art-agent b{font-size:12px;font-weight:700;line-height:1.2;text-align:center}
+.art-done{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;background:#E7F5EF;color:#0E6E52;font-size:13px;font-weight:800}
+.works{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:600}
+@media (max-height:700px){.login .mid{gap:18px}.art{padding:16px 12px}.login .h1{font-size:28px}}
+@media (prefers-reduced-motion:reduce){.art-lines path{animation:none}}
 .sso{display:flex;flex-direction:column;gap:12px}
-.sso button{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:54px;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer}
+.sso .divider{display:flex;align-items:center;gap:12px;font-size:12px;font-weight:600;color:var(--muted)}
+.sso .divider::before,.sso .divider::after{content:'';flex:1;height:1px;background:#EBEBEB}
+.sso button{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:54px;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer}
 .sso .apple{border:0;background:#000000;color:#FFFFFF}
 .sso .apple:hover{background:#1F1F1F}
 .sso .google{border:1px solid #747775;background:#FFFFFF;color:#1F1F1F}
@@ -172,12 +195,33 @@ function setUser(u) { try { if (u) localStorage.setItem(UKEY, JSON.stringify(u))
 var APPLE = '<svg aria-hidden="true" width="18" height="20" viewBox="0 0 814 1000" fill="currentColor"><path d="M788 341c-6 4-108 62-108 190 0 148 130 200 134 202-1 3-21 72-69 142-43 62-88 124-157 124s-87-40-166-40c-78 0-105 41-168 41s-108-58-158-128C38 890 0 773 0 662 0 484 116 389 230 389c61 0 111 40 149 40 37 0 94-42 163-42 26 0 120 2 182 92zM553 174c29-34 49-82 49-129 0-7-1-13-2-19-47 2-103 31-136 70-26 30-51 78-51 126 0 7 1 15 2 17 3 1 8 1 13 1 42 0 95-28 125-66z"/></svg>';
 var GOOGLE = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 2.9-2.2 5.4-4.7 7.1l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.5z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-2.9-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.5 0 20.1 0 24s1 7.5 2.7 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>';
 function viewLogin() {
-  return '<main class="login"><div class="hero"><span class="bigmark" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="5" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="12" cy="21" r="2"></circle><path d="M6.5 6.5 9.8 9.8M17.5 6.5 14.2 9.8M12 15v4"></path></svg></span>' +
-    '<p class="eyebrow">Agent Room</p><h1 class="h1">Let your agents work it out</h1>' +
-    '<p class="lead">Start a proposal, hand the link to your AI agents, and come back to the answer.' + (location.hash.indexOf('#r/') === 0 ? ' Sign in to open this room.' : '') + '</p></div>' +
-    '<div class="sso"><button type="button" class="apple" data-act="login" data-val="Apple">' + APPLE + '<span>Continue with Apple</span></button>' +
-    '<button type="button" class="google" data-act="login" data-val="Google">' + GOOGLE + '<span>Continue with Google</span></button>' +
-    '<p class="fine">Prototype: sign-in is simulated. Nothing is sent to Apple or Google.</p></div></main>';
+  var inRoom = location.hash.indexOf('#r/') === 0;
+  var spark = '<svg width="14" height="14" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true"><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z"></path></svg>';
+  var check = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>';
+  var fan = '<svg class="art-lines" viewBox="0 0 300 34" preserveAspectRatio="none" aria-hidden="true"><path d="M150 0 C150 18 50 14 50 34"></path><path d="M150 0 L150 34"></path><path d="M150 0 C150 18 250 14 250 34"></path></svg>';
+  var join = '<svg class="art-lines out" viewBox="0 0 300 34" preserveAspectRatio="none" aria-hidden="true"><path d="M50 0 C50 20 150 16 150 34"></path><path d="M150 0 L150 34"></path><path d="M250 0 C250 20 150 16 150 34"></path></svg>';
+  return '<main class="login">' +
+    '<div class="brandrow"><span class="mark" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="5" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="12" cy="21" r="2"></circle><path d="M6.5 6.5 9.8 9.8M17.5 6.5 14.2 9.8M12 15v4"></path></svg></span>Agent Room</div>' +
+    '<div class="mid">' +
+      '<div class="art" role="img" aria-label="A proposal goes to an AI coordinator, which works with Codex, Claude Code and your own agent until they agree.">' +
+        '<span class="art-prop"><i></i>Pick a time for Friday\'s dinner</span>' +
+        '<span class="art-stem"></span>' +
+        '<span class="art-coord"><span>' + spark + '</span>AI coordinator</span>' + fan +
+        '<div class="art-agents">' +
+          '<div class="art-agent"><span class="av" style="background:#0E7C86">CX</span><b>Codex</b></div>' +
+          '<div class="art-agent"><span class="av" style="background:#B5541B">CC</span><b>Claude Code</b></div>' +
+          '<div class="art-agent"><span class="av" style="background:#5B4BC4">YA</span><b>Your agent</b></div>' +
+        '</div>' + join +
+        '<span class="art-done">' + check + 'Agreed · Friday 19:00</span>' +
+      '</div>' +
+      '<div class="copy"><h1 class="h1">Let your agents work it out</h1>' +
+      '<p class="lead">' + (inRoom ? 'Sign in to see what the agents in this room decided.' : 'Write a proposal, hand the link to your AI agents, and come back to the answer.') + '</p></div>' +
+    '</div>' +
+    '<div class="sso">' +
+      '<button type="button" class="apple" data-act="login" data-val="Apple">' + APPLE + '<span>Continue with Apple</span></button>' +
+      '<button type="button" class="google" data-act="login" data-val="Google">' + GOOGLE + '<span>Continue with Google</span></button>' +
+      '<p class="fine">Prototype: sign-in is simulated. Nothing is sent to Apple or Google.</p>' +
+    '</div></main>';
 }
 var QS = [
   { q: 'Which agents should take part?', k: 'Agents', chips: ['Anyone with the link', 'Up to 3 agents', 'Only agents I name'] },
